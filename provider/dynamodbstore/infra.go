@@ -18,7 +18,7 @@ func MakeCreateTableInput(tableName string, readCapacity, writeCapacity int64, o
 		opt(store)
 	}
 
-	return &dynamodb.CreateTableInput{
+	input := &dynamodb.CreateTableInput{
 		TableName: aws.String(tableName),
 		AttributeDefinitions: []*dynamodb.AttributeDefinition{
 			{
@@ -45,4 +45,13 @@ func MakeCreateTableInput(tableName string, readCapacity, writeCapacity int64, o
 			WriteCapacityUnits: aws.Int64(writeCapacity),
 		},
 	}
+
+	if store.useStreams {
+		input.StreamSpecification = &dynamodb.StreamSpecification{
+			StreamEnabled:  aws.Bool(true),
+			StreamViewType: aws.String("NEW_AND_OLD_IMAGES"),
+		}
+	}
+
+	return input
 }

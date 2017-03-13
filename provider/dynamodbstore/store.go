@@ -35,6 +35,7 @@ type Store struct {
 	hashKey       string
 	rangeKey      string
 	api           *dynamodb.DynamoDB
+	useStreams    bool
 	eventsPerItem int
 }
 

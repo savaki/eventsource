@@ -32,8 +32,17 @@ func WithEventPerItem(eventsPerItem int) Option {
 	}
 }
 
-func WithDynamoDB(api *dynamodb.DynamoDB) Option{
+// WithDynamoDB allows the caller to specify a pre-configured reference to DynamoDB
+func WithDynamoDB(api *dynamodb.DynamoDB) Option {
 	return func(s *Store) {
 		s.api = api
+	}
+}
+
+// WithStreams is an option only used by the MakeCreateTableInput that indicates the table should be created with
+// DynamoDB streams enabled
+func WithStreams() Option {
+	return func(s *Store) {
+		s.useStreams = true
 	}
 }
