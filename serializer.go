@@ -28,7 +28,7 @@ func (j *jsonSerializer) Bind(events ...interface{}) error {
 			t = t.Elem()
 		}
 
-		j.eventTypes[meta.AggregateType] = t
+		j.eventTypes[meta.EventType] = t
 	}
 
 	return nil

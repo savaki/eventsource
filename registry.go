@@ -64,7 +64,7 @@ func (r *Registry) Bind(event interface{}, h EventHandler) error {
 		return err
 	}
 
-	if _, ok := r.handlers[meta.AggregateType]; ok {
+	if _, ok := r.handlers[meta.EventType]; ok {
 		return errors.New("handler already defined")
 	}
 
@@ -73,8 +73,8 @@ func (r *Registry) Bind(event interface{}, h EventHandler) error {
 		eventType = eventType.Elem()
 	}
 
-	r.types[meta.AggregateType] = eventType
-	r.handlers[meta.AggregateType] = h
+	r.types[meta.EventType] = eventType
+	r.handlers[meta.EventType] = h
 	return nil
 }
 
@@ -112,7 +112,7 @@ func (r *Registry) LoadVersion(ctx context.Context, aggregateID string, version 
 			return nil, version, err
 		}
 
-		h, ok := r.handlers[meta.AggregateType]
+		h, ok := r.handlers[meta.EventType]
 		if !ok {
 			return nil, version, errors.New("no handler bound")
 		}

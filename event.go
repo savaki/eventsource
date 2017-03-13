@@ -39,11 +39,11 @@ func (e EpochMillis) Time() time.Time {
 }
 
 type EventMeta struct {
-	AggregateID   string
-	AggregateType string
-	Event         interface{}
-	Version       int
-	At            EpochMillis
+	AggregateID string
+	EventType   string
+	Event       interface{}
+	Version     int
+	At          EpochMillis
 }
 
 type Model struct {
@@ -102,7 +102,7 @@ func Inspect(event interface{}) (EventMeta, error) {
 
 		if v := strings.Index(tag, ","); v > 0 {
 			if v := tag[v+1:]; strings.HasPrefix(v, typePrefix) {
-				meta.AggregateType = v[len(typePrefix):]
+				meta.EventType = v[len(typePrefix):]
 				hasAggregateType = true
 			}
 			tag = tag[0:v]
@@ -154,7 +154,7 @@ func Inspect(event interface{}) (EventMeta, error) {
 	}
 
 	if !hasAggregateType {
-		meta.AggregateType = eventType.Name()
+		meta.EventType = eventType.Name()
 	}
 
 	return meta, nil

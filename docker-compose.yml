@@ -1,4 +1,14 @@
 dynamodb:
   image: savaki/dynamodb:latest
   ports:
-    - "8001:8000"
+    - "8000:8000"
+
+mysql:
+  image: mysql:5.7
+  ports:
+    - "3306:3306"
+  environment:
+    - MYSQL_USER=eventsource
+    - MYSQL_PASSWORD=password
+    - MYSQL_ROOT_PASSWORD=password
+    - MYSQL_DATABASE=eventsource

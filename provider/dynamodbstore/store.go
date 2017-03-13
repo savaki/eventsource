@@ -241,7 +241,7 @@ func makeUpdateItemInput(tableName, hashKey, rangeKey string, eventsPerItem int,
 				valueRef := ":" + eventTypePrefix + version
 				fmt.Fprintf(updateExpr, ", %v = %v", nameRef, valueRef)
 				input.ExpressionAttributeNames[nameRef] = aws.String(key)
-				input.ExpressionAttributeValues[valueRef] = &dynamodb.AttributeValue{S: aws.String(meta.AggregateType)}
+				input.ExpressionAttributeValues[valueRef] = &dynamodb.AttributeValue{S: aws.String(meta.EventType)}
 			}
 		}
 

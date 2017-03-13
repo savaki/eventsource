@@ -17,7 +17,7 @@ func init() {
 	cfg := &aws.Config{
 		Credentials: credentials.NewStaticCredentials("blah", "blah", ""),
 		Region:      aws.String("us-east-1"),
-		Endpoint:    aws.String("http://localhost:8001"),
+		Endpoint:    aws.String("http://localhost:8000"),
 	}
 	s, err := session.NewSession(cfg)
 	if err != nil {
