@@ -12,65 +12,67 @@ import (
 // User represents out domain model
 type User struct {
 	ID    string `eventsource:"id"`
-	First string
-	Last  string
+	Name  string
+	Email string
 }
 
-// UserFirstSet defines an event by simple struct embedding
-type UserFirstSet struct {
+// UserNameSet defines an event by simple struct embedding
+type UserNameSet struct {
 	eventsource.Model
-	First string
+	Name string
 }
 
-// UserLastSet defines an event via tags
-type UserLastSet struct {
-	ID      string `eventsource:"id,type:user-last-set"`
+// UserEmailSet defines an event via tags
+type UserEmailSet struct {
+	ID      string `eventsource:"id,type:user-email-set"`
 	Version int    `eventsource:"version"`
-	Last    string
+	Email   string
 }
 
-func SetFirst(_ context.Context, aggregate, event interface{}) error {
+func SetName(_ context.Context, aggregate, event interface{}) error {
 	user := aggregate.(*User)
-	v := event.(UserFirstSet)
+	v := event.(*UserNameSet)
 
-	user.First = v.First
+	user.Name = v.Name
 	return nil
 }
 
-func SetLast(_ context.Context, aggregate, event interface{}) error {
+func SetEmail(_ context.Context, aggregate, event interface{}) error {
 	user := aggregate.(*User)
-	v := event.(UserLastSet)
+	v := event.(*UserEmailSet)
 
-	user.Last = v.Last
+	user.Email = v.Email
 	return nil
 }
 
 func main() {
-	store, err := dynamodbstore.New("user_events", dynamodbstore.WithRegion("us-west-2"))
+	store, err := dynamodbstore.New("user_events",
+		dynamodbstore.WithRegion("us-west-2"),
+	)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	userEvents := eventsource.New(User{}, eventsource.WithStore(store))
-	userEvents.BindFunc(UserFirstSet{}, SetFirst)
-	userEvents.BindFunc(UserLastSet{}, SetLast)
+	userEvents.BindFunc(UserNameSet{}, SetName)
+	userEvents.BindFunc(UserEmailSet{}, SetEmail)
 
 	id := "123"
-	setFirstEvent := UserFirstSet{
+	setNameEvent := UserNameSet{
 		Model: eventsource.Model{
 			AggregateID: id,
 			Version:     1,
 		},
-		First: "Joe",
+		Name: "Joe Public",
 	}
-	setLastEvent := UserLastSet{
+	setEmailEvent := UserEmailSet{
 		ID:      id,
 		Version: 2,
-		Last:    "Public",
+		Email:   "joe.public@example.com",
 	}
 
 	ctx := context.Background()
-	err = userEvents.Save(ctx, setFirstEvent, setLastEvent)
+	err = userEvents.Save(ctx, setNameEvent, setEmailEvent)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -81,5 +83,5 @@ func main() {
 	}
 
 	user := v.(*User)
-	fmt.Printf("Hello %v %v [Version %v]\n", user.First, user.Last, version) // prints "Hello Joe Public [1]"
+	fmt.Printf("Hello %v %v [Version %v]\n", user.Name, user.Email, version) // prints "Hello Joe Public [1]"
 }
