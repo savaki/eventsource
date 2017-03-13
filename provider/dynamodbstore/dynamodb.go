@@ -273,7 +273,7 @@ func makeQueryInput(tableName, hashKey, rangeKey string, aggregateID string, par
 		input.KeyConditionExpression = aws.String("#key = :key")
 
 	} else {
-		input.KeyConditionExpression = aws.String("#key = :key AND #partition < :partition")
+		input.KeyConditionExpression = aws.String("#key = :key AND #partition <= :partition")
 		input.ExpressionAttributeNames["#partition"] = aws.String(rangeKey)
 		input.ExpressionAttributeValues[":partition"] = &dynamodb.AttributeValue{N: aws.String(strconv.Itoa(partition))}
 	}

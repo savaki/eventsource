@@ -74,11 +74,11 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	v, err := userEvents.Load(ctx, id)
+	v, version, err := userEvents.Load(ctx, id)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	user := v.(*User)
-	fmt.Println("Hello", user.First, user.Last) // prints "Hello Joe Public"
+	fmt.Printf("Hello %v %v [Version %v]\n", user.First, user.Last, version) // prints "Hello Joe Public [1]"
 }

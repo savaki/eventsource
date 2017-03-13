@@ -153,5 +153,37 @@ func TestSave(t *testing.T) {
 }
 
 func TestStore_Fetch(t *testing.T) {
+	tableName := "sample_events"
 
+	aggregateID := strconv.FormatInt(time.Now().UnixNano(), 10)
+	first := EntitySetFirst{
+		Model: eventsource.Model{
+			AggregateID: aggregateID,
+			Version:     1,
+		},
+		First: "first",
+	}
+	second := EntitySetLast{
+		Model: eventsource.Model{
+			AggregateID: aggregateID,
+			Version:     2,
+		},
+		Last: "last",
+	}
+
+	serializer := eventsource.JSONSerializer()
+	serializer.Bind(first, second)
+
+	store, err := dynamodbstore.New(tableName, dynamodbstore.WithDynamoDB(api))
+	assert.Nil(t, err)
+
+	ctx := context.Background()
+	err = store.Save(ctx, serializer, first, second)
+	assert.Nil(t, err)
+
+	events, n, err := store.Fetch(ctx, serializer, aggregateID, 1)
+	assert.Nil(t, err)
+	assert.Equal(t, 1, n)
+	assert.Equal(t, 1, len(events))
+	assert.Equal(t, &first, events[0])
 }

@@ -42,8 +42,9 @@ func TestRegistry(t *testing.T) {
 		})
 		assert.Nil(t, err)
 
-		v, err := registry.Load(ctx, aggregateID)
+		v, n, err := registry.Load(ctx, aggregateID)
 		assert.Nil(t, err)
+		assert.Equal(t, 0, n)
 
 		org, ok := v.(*Org)
 		assert.True(t, ok)
@@ -54,13 +55,14 @@ func TestRegistry(t *testing.T) {
 
 		updated := "Sarah"
 		err = registry.Save(ctx, OrgNameSet{
-			Model: eventsource.Model{AggregateID: aggregateID, Version: 1},
+			Model: eventsource.Model{AggregateID: aggregateID, Version: 0},
 			Name:  updated,
 		})
 		assert.Nil(t, err)
 
-		v, err = registry.Load(ctx, aggregateID)
+		v, n, err = registry.Load(ctx, aggregateID)
 		assert.Nil(t, err)
+		assert.Equal(t, 0, n)
 
 		org, ok = v.(*Org)
 		assert.True(t, ok)
@@ -78,8 +80,9 @@ func TestRegistry(t *testing.T) {
 		})
 		assert.Nil(t, err)
 
-		v, err := registry.Load(ctx, aggregateID)
+		v, n, err := registry.Load(ctx, aggregateID)
 		assert.Nil(t, err)
+		assert.Equal(t, 0, n)
 		assert.Equal(t, name, v.(*Org).Name)
 	})
 
@@ -93,8 +96,9 @@ func TestRegistry(t *testing.T) {
 		})
 		assert.Nil(t, err)
 
-		v, err := registry.Load(ctx, aggregateID)
+		v, n, err := registry.Load(ctx, aggregateID)
 		assert.Nil(t, err)
+		assert.Equal(t, 0, n)
 		assert.Equal(t, name, v.(*Org).Name)
 	})
 }
