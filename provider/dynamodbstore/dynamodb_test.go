@@ -2,6 +2,7 @@ package dynamodbstore_test
 
 import (
 	"context"
+	"log"
 	"sort"
 	"strconv"
 	"testing"
@@ -16,6 +17,21 @@ import (
 	"github.com/savaki/eventsource/provider/dynamodbstore"
 	"github.com/stretchr/testify/assert"
 )
+
+var api *dynamodb.DynamoDB
+
+func init() {
+	cfg := &aws.Config{
+		Credentials: credentials.NewStaticCredentials("blah", "blah", ""),
+		Region:      aws.String("us-east-1"),
+		Endpoint:    aws.String("http://localhost:8001"),
+	}
+	s, err := session.NewSession(cfg)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	api = dynamodb.New(s)
+}
 
 type EntitySetFirst struct {
 	eventsource.Model
@@ -68,17 +84,8 @@ func fetchPartitions(api *dynamodb.DynamoDB, tableName, key string) ([]string, e
 }
 
 func TestSave(t *testing.T) {
-	cfg := &aws.Config{
-		Credentials: credentials.NewStaticCredentials("blah", "blah", ""),
-		Region:      aws.String("us-east-1"),
-		Endpoint:    aws.String("http://localhost:8001"),
-	}
-	s, err := session.NewSession(cfg)
-	assert.Nil(t, err)
-	api := dynamodb.New(s)
-
 	tableName := "sample_events"
-	_, err = api.CreateTable(dynamodbstore.MakeCreateTableInput(tableName, 10, 10))
+	_, err := api.CreateTable(dynamodbstore.MakeCreateTableInput(tableName, 10, 10))
 	if err != nil {
 		v, ok := err.(awserr.Error)
 		assert.True(t, ok && v.Code() == "ResourceInUseException")
@@ -143,4 +150,8 @@ func TestSave(t *testing.T) {
 			assert.Equal(t, tc.Partitions, partitions)
 		})
 	}
+}
+
+func TestStore_Fetch(t *testing.T) {
+
 }
