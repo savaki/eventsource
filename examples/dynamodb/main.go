@@ -83,5 +83,5 @@ func main() {
 	}
 
 	user := v.(*User)
-	fmt.Printf("Hello %v %v [Version %v]\n", user.Name, user.Email, version) // prints "Hello Joe Public [1]"
+	fmt.Printf("Hello %v %v [Version %v]\n", user.Name, user.Email, version) // prints "Hello Joe Public joe.public@example.com [Version 2]"
 }
