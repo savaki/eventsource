@@ -9,6 +9,7 @@ import (
 	"github.com/savaki/eventsource/provider/dynamodbstore"
 )
 
+// User represents out domain model
 type User struct {
 	ID    string `eventsource:"id"`
 	First string
