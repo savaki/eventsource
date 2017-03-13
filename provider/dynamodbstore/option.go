@@ -1,5 +1,7 @@
 package dynamodbstore
 
+import "github.com/aws/aws-sdk-go/service/dynamodb"
+
 type Option func(*Store)
 
 // WithRegion specifies the AWS Region to connect to
@@ -27,5 +29,11 @@ func WithRangeKey(rangeKey string) Option {
 func WithEventPerItem(eventsPerItem int) Option {
 	return func(s *Store) {
 		s.eventsPerItem = eventsPerItem
+	}
+}
+
+func WithDynamoDB(api *dynamodb.DynamoDB) Option{
+	return func(s *Store) {
+		s.api = api
 	}
 }

@@ -3,10 +3,8 @@ package dynamodbstore
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -46,10 +44,6 @@ func (s *Store) Save(ctx context.Context, serializer eventsource.Serializer, eve
 	if err != nil {
 		return err
 	}
-
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	encoder.Encode(inputs)
 
 	for _, input := range inputs {
 		_, err := s.api.UpdateItem(input)
@@ -149,7 +143,8 @@ func New(tableName string, opts ...Option) (*Store, error) {
 	}
 
 	if store.api == nil {
-		s, err := session.NewSession()
+		cfg := &aws.Config{Region: aws.String(store.region)}
+		s, err := session.NewSession(cfg)
 		if err != nil {
 			if v, ok := err.(awserr.Error); ok {
 				return nil, errors.Wrapf(err, "Unable to create AWS Session - %v [%v]", v.Message(), v.Code())
