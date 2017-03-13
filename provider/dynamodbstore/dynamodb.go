@@ -64,11 +64,11 @@ func (s *Store) Save(ctx context.Context, serializer eventsource.Serializer, eve
 	return nil
 }
 
-func (s *Store) Fetch(ctx context.Context, serializer eventsource.Serializer, aggregateID string, version int) ([]interface{}, error) {
-	partition := version / s.eventsPerItem
+func (s *Store) Fetch(ctx context.Context, serializer eventsource.Serializer, aggregateID string, version int) ([]interface{}, int, error) {
+	partition := selectPartition(version, s.eventsPerItem)
 	input, err := makeQueryInput(s.tableName, s.hashKey, s.rangeKey, aggregateID, partition)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	metas := make([]eventsource.EventMeta, 0, version)
@@ -77,7 +77,7 @@ func (s *Store) Fetch(ctx context.Context, serializer eventsource.Serializer, ag
 	for {
 		out, err := s.api.Query(input)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 
 		if len(out.Items) == 0 {
@@ -103,12 +103,12 @@ func (s *Store) Fetch(ctx context.Context, serializer eventsource.Serializer, ag
 				data := item[dataKey].B
 				event, err := serializer.Deserialize(eventType, data)
 				if err != nil {
-					return nil, err
+					return nil, 0, err
 				}
 
 				meta, err := eventsource.Inspect(event)
 				if err != nil {
-					return nil, err
+					return nil, 0, err
 				}
 
 				metas = append(metas, meta)
@@ -125,12 +125,14 @@ func (s *Store) Fetch(ctx context.Context, serializer eventsource.Serializer, ag
 		return metas[i].Version < metas[j].Version
 	})
 
+	foundVersion := 0
 	events := make([]interface{}, 0, version)
 	for _, meta := range metas {
 		events = append(events, meta.Event)
+		foundVersion = meta.Version
 	}
 
-	return events, nil
+	return events, foundVersion, nil
 }
 
 func New(tableName string, opts ...Option) (*Store, error) {
@@ -169,7 +171,7 @@ func partition(eventsPerItem int, events ...interface{}) (map[int][]eventsource.
 			return nil, err
 		}
 
-		id := meta.Version / eventsPerItem
+		id := selectPartition(meta.Version, eventsPerItem)
 		p, ok := partitions[id]
 		if !ok {
 			p = []eventsource.EventMeta{}
@@ -196,15 +198,19 @@ func makeUpdateItemInput(tableName, hashKey, rangeKey string, eventsPerItem int,
 				hashKey:  {S: aws.String(partition[0].AggregateID)},
 				rangeKey: {N: aws.String(strconv.Itoa(partitionID))},
 			},
-			ExpressionAttributeNames:  map[string]*string{},
-			ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{},
+			ExpressionAttributeNames: map[string]*string{
+				"#revision": aws.String("revision"),
+			},
+			ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+				":one": {N: aws.String("1")},
+			},
 		}
 
 		// Add each element within the partition to the UpdateItemInput
 
 		condExpr := &bytes.Buffer{}
 		updateExpr := &bytes.Buffer{}
-		io.WriteString(updateExpr, "SET ")
+		io.WriteString(updateExpr, "ADD #revision :one SET ")
 
 		for index, meta := range partition {
 			version := strconv.Itoa(meta.Version)
@@ -278,4 +284,8 @@ func makeQueryInput(tableName, hashKey, rangeKey string, aggregateID string, par
 	}
 
 	return input, nil
+}
+
+func selectPartition(version, eventsPerItem int) int {
+	return version / eventsPerItem
 }

@@ -22,33 +22,56 @@ type EntitySetLast struct {
 }
 
 func TestSave(t *testing.T) {
-	aggregateID := strconv.FormatInt(time.Now().UnixNano(), 10)
-	first := EntitySetFirst{
-		Model: eventsource.Model{
-			AggregateID: aggregateID,
-			Version:     1,
+	testCases := map[string]struct {
+		EventsPerItem int
+		ExpectedItems int
+	}{
+		"big": {
+			EventsPerItem: 3,
+			ExpectedItems: 1,
 		},
-		First: "first",
-	}
-	second := EntitySetLast{
-		Model: eventsource.Model{
-			AggregateID: aggregateID,
-			Version:     2,
+		"split": {
+			EventsPerItem: 2,
+			ExpectedItems: 2,
 		},
-		Last: "last",
+		"single": {
+			EventsPerItem: 1,
+			ExpectedItems: 2,
+		},
 	}
 
-	serializer := eventsource.JSONSerializer()
-	serializer.Bind(first, second)
+	for label, tc := range testCases {
+		t.Run(label, func(t *testing.T) {
+			aggregateID := strconv.FormatInt(time.Now().UnixNano(), 10)
+			first := EntitySetFirst{
+				Model: eventsource.Model{
+					AggregateID: aggregateID,
+					Version:     1,
+				},
+				First: "first",
+			}
+			second := EntitySetLast{
+				Model: eventsource.Model{
+					AggregateID: aggregateID,
+					Version:     2,
+				},
+				Last: "last",
+			}
 
-	ctx := context.Background()
-	store, err := dynamodbstore.New("sample_events", dynamodbstore.WithEventPerItem(12))
-	assert.Nil(t, err)
+			serializer := eventsource.JSONSerializer()
+			serializer.Bind(first, second)
 
-	err = store.Save(ctx, serializer, first, second)
-	assert.Nil(t, err)
+			ctx := context.Background()
+			store, err := dynamodbstore.New("sample_events", dynamodbstore.WithEventPerItem(tc.EventsPerItem))
+			assert.Nil(t, err)
 
-	events, err := store.Fetch(ctx, serializer, aggregateID, 0)
-	assert.Nil(t, err)
-	assert.Equal(t, []interface{}{&first, &second}, events)
+			err = store.Save(ctx, serializer, first, second)
+			assert.Nil(t, err)
+
+			events, version, err := store.Fetch(ctx, serializer, aggregateID, 0)
+			assert.Nil(t, err)
+			assert.Equal(t, []interface{}{&first, &second}, events)
+			assert.Equal(t, second.Model.Version, version)
+		})
+	}
 }

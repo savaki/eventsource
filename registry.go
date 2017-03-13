@@ -82,48 +82,48 @@ func (r *Registry) Save(ctx context.Context, events ...interface{}) error {
 	return r.store.Save(ctx, r.serializer, events...)
 }
 
-func (r *Registry) Fetch(ctx context.Context, aggregateID string, version int) ([]interface{}, error) {
+func (r *Registry) Fetch(ctx context.Context, aggregateID string, version int) ([]interface{}, int, error) {
 	return r.store.Fetch(ctx, r.serializer, aggregateID, version)
 }
 
-func (r *Registry) Load(ctx context.Context, aggregateID string) (interface{}, error) {
+func (r *Registry) Load(ctx context.Context, aggregateID string) (interface{}, int, error) {
 	return r.LoadVersion(ctx, aggregateID, 0)
 }
 
-func (r *Registry) LoadVersion(ctx context.Context, aggregateID string, version int) (interface{}, error) {
-	events, err := r.Fetch(ctx, aggregateID, version)
+func (r *Registry) LoadVersion(ctx context.Context, aggregateID string, version int) (interface{}, int, error) {
+	events, version, err := r.Fetch(ctx, aggregateID, version)
 	if err != nil {
-		return nil, err
+		return nil, version, err
 	}
 
 	if len(events) == 0 {
-		return nil, errors.New("not found")
+		return nil, version, errors.New("not found")
 	}
 
 	v := reflect.New(r.prototype).Interface()
 	err = setAggregateID(v, aggregateID)
 	if err != nil {
-		return nil, err
+		return nil, version, err
 	}
 
 	for _, event := range events {
 		meta, err := Inspect(event)
 		if err != nil {
-			return nil, err
+			return nil, version, err
 		}
 
 		h, ok := r.handlers[meta.AggregateType]
 		if !ok {
-			return nil, errors.New("no handler bound")
+			return nil, version, errors.New("no handler bound")
 		}
 
 		err = h.HandleEvent(ctx, v, event)
 		if err != nil {
-			return nil, err
+			return nil, version, err
 		}
 	}
 
-	return v, nil
+	return v, version, nil
 }
 
 type Option func(registry *Registry)
