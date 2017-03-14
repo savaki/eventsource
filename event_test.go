@@ -102,3 +102,11 @@ func TestSetAggregateID(t *testing.T) {
 		assert.Equal(t, aggregateID, item.ID)
 	})
 }
+
+func TestNow(t *testing.T) {
+	delta := Now().Time().Sub(time.Now())
+	if delta < 0 {
+		delta *= -1
+	}
+	assert.True(t, delta <= time.Millisecond)
+}

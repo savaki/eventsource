@@ -38,6 +38,13 @@ func (e EpochMillis) Time() time.Time {
 	return time.Unix(seconds, millis*1e6)
 }
 
+func Now() EpochMillis {
+	now := time.Now()
+	seconds := now.Unix() * 1e3
+	millis := int64(now.Nanosecond()) / 1e6
+	return EpochMillis(seconds + millis)
+}
+
 type EventMeta struct {
 	ID        string
 	EventType string
