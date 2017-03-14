@@ -3,6 +3,7 @@ package dynamodbstore_test
 import (
 	"context"
 	"log"
+	"os"
 	"sort"
 	"strconv"
 	"testing"
@@ -229,7 +230,10 @@ func TestStore_Fetch(t *testing.T) {
 	serializer := eventsource.JSONSerializer()
 	serializer.Bind(first, second)
 
-	store, err := dynamodbstore.New(tableName, dynamodbstore.WithDynamoDB(api))
+	store, err := dynamodbstore.New(tableName,
+		dynamodbstore.WithDynamoDB(api),
+		dynamodbstore.WithDebug(os.Stdout),
+	)
 	assert.Nil(t, err)
 
 	ctx := context.Background()

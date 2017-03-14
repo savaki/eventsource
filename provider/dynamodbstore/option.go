@@ -1,6 +1,10 @@
 package dynamodbstore
 
-import "github.com/aws/aws-sdk-go/service/dynamodb"
+import (
+	"io"
+
+	"github.com/aws/aws-sdk-go/service/dynamodb"
+)
 
 type Option func(*Store)
 
@@ -44,5 +48,13 @@ func WithDynamoDB(api *dynamodb.DynamoDB) Option {
 func WithStreams() Option {
 	return func(s *Store) {
 		s.useStreams = true
+	}
+}
+
+// WithDebug provides additional debugging information
+func WithDebug(w io.Writer) Option {
+	return func(s *Store) {
+		s.debug = true
+		s.writer = w
 	}
 }

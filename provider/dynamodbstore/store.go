@@ -3,11 +3,13 @@ package dynamodbstore
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -53,6 +55,8 @@ type Store struct {
 	api           *dynamodb.DynamoDB
 	useStreams    bool
 	eventsPerItem int
+	debug         bool
+	writer        io.Writer
 }
 
 // Save implements the eventsource.Store interface
@@ -63,6 +67,12 @@ func (s *Store) Save(ctx context.Context, serializer eventsource.Serializer, eve
 	}
 
 	for _, input := range inputs {
+		if s.debug {
+			encoder := json.NewEncoder(s.writer)
+			encoder.SetIndent("", "  ")
+			encoder.Encode(input)
+		}
+
 		_, err := s.api.UpdateItem(input)
 		if err != nil {
 			if v, ok := err.(awserr.Error); ok {
@@ -73,6 +83,20 @@ func (s *Store) Save(ctx context.Context, serializer eventsource.Serializer, eve
 	}
 
 	return nil
+}
+
+func (s *Store) logf(format string, args ...interface{}) {
+	if s.debug {
+		return
+	}
+
+	io.WriteString(s.writer, time.Now().Format(time.StampMilli))
+	io.WriteString(s.writer, " ")
+	fmt.Fprintf(s.writer, format, args...)
+
+	if !strings.HasSuffix(format, "\n") {
+		io.WriteString(s.writer, "\n")
+	}
 }
 
 func (s *Store) Fetch(ctx context.Context, serializer eventsource.Serializer, aggregateID string, version int) (eventsource.History, error) {
