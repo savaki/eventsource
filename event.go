@@ -39,17 +39,17 @@ func (e EpochMillis) Time() time.Time {
 }
 
 type EventMeta struct {
-	AggregateID string
-	EventType   string
-	Event       interface{}
-	Version     int
-	At          EpochMillis
+	ID        string
+	EventType string
+	Event     interface{}
+	Version   int
+	At        EpochMillis
 }
 
 type Model struct {
-	AggregateID string
-	Version     int
-	At          EpochMillis
+	ID      string
+	Version int
+	At      EpochMillis
 }
 
 func Inspect(event interface{}) (EventMeta, error) {
@@ -71,8 +71,8 @@ func Inspect(event interface{}) (EventMeta, error) {
 		eventValue = eventValue.Elem()
 	}
 
-	hasAggregateID := false
-	hasAggregateType := false
+	hasID := false
+	hasEventType := false
 	hasVersion := false
 	hasAt := false
 
@@ -83,11 +83,11 @@ func Inspect(event interface{}) (EventMeta, error) {
 
 		if field.Name == "Model" && field.Type == modelType {
 			if m, ok := eventValue.Field(i).Interface().(Model); ok {
-				meta.AggregateID = m.AggregateID
+				meta.ID = m.ID
 				meta.Version = m.Version
 				meta.At = m.At
 
-				hasAggregateID = true
+				hasID = true
 				hasVersion = true
 				hasAt = true
 
@@ -103,25 +103,25 @@ func Inspect(event interface{}) (EventMeta, error) {
 		if v := strings.Index(tag, ","); v > 0 {
 			if v := tag[v+1:]; strings.HasPrefix(v, typePrefix) {
 				meta.EventType = v[len(typePrefix):]
-				hasAggregateType = true
+				hasEventType = true
 			}
 			tag = tag[0:v]
 		}
 
 		switch tag {
 		case "id":
-			if hasAggregateID {
+			if hasID {
 				return meta, errors.New("duplicate defintion of id found")
 			}
 			switch fieldValue := eventValue.Field(i).Interface().(type) {
 			case string:
-				meta.AggregateID = fieldValue
+				meta.ID = fieldValue
 			case fmt.Stringer:
-				meta.AggregateID = fieldValue.String()
+				meta.ID = fieldValue.String()
 			default:
 				return meta, errors.New("eventsource id field must be either string or fmt.Stringer")
 			}
-			hasAggregateID = true
+			hasID = true
 
 		case "version":
 			if hasVersion {
@@ -153,7 +153,7 @@ func Inspect(event interface{}) (EventMeta, error) {
 		}
 	}
 
-	if !hasAggregateType {
+	if !hasEventType {
 		meta.EventType = eventType.Name()
 	}
 

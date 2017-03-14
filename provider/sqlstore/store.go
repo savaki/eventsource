@@ -64,7 +64,7 @@ func (s *Store) Save(ctx context.Context, serializer eventsource.Serializer, eve
 			}
 
 			s.log("Saving version,", meta.Version)
-			_, err = stmt.Exec(meta.AggregateID, meta.EventType, data, meta.Version, meta.At)
+			_, err = stmt.Exec(meta.ID, meta.EventType, data, meta.Version, meta.At)
 			if err != nil {
 				return err
 			}

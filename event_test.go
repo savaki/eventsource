@@ -21,14 +21,14 @@ func TestInspect(t *testing.T) {
 	t.Run("embbeded", func(t *testing.T) {
 		item := Embedded{
 			Model: Model{
-				AggregateID: "123",
-				Version:     4,
-				At:          567,
+				ID:      "123",
+				Version: 4,
+				At:      567,
 			},
 		}
 		meta, err := Inspect(item)
 		assert.Nil(t, err)
-		assert.Equal(t, item.Model.AggregateID, meta.AggregateID)
+		assert.Equal(t, item.Model.ID, meta.ID)
 		assert.Equal(t, "Embedded", meta.EventType)
 		assert.Equal(t, item.Model.Version, meta.Version)
 		assert.Equal(t, item.Model.At, meta.At)
@@ -42,7 +42,7 @@ func TestInspect(t *testing.T) {
 		}
 		meta, err := Inspect(item)
 		assert.Nil(t, err)
-		assert.Equal(t, item.ID, meta.AggregateID)
+		assert.Equal(t, item.ID, meta.ID)
 		assert.Equal(t, "blah", meta.EventType)
 		assert.Equal(t, item.Revision, meta.Version)
 		assert.Equal(t, item.CreatedAt.Unix(), meta.At.Time().Unix())
@@ -56,7 +56,7 @@ var (
 func BenchmarkInspectEmbedded(b *testing.B) {
 	item := Embedded{
 		Model: Model{
-			AggregateID: "123",
+			ID: "123",
 		},
 	}
 
@@ -64,7 +64,7 @@ func BenchmarkInspectEmbedded(b *testing.B) {
 		meta, _ = Inspect(item)
 	}
 
-	assert.Equal(b, item.Model.AggregateID, meta.AggregateID)
+	assert.Equal(b, item.Model.ID, meta.ID)
 }
 
 func BenchmarkInspectTagged(b *testing.B) {
@@ -78,7 +78,7 @@ func BenchmarkInspectTagged(b *testing.B) {
 		meta, _ = Inspect(item)
 	}
 
-	assert.Equal(b, item.ID, meta.AggregateID)
+	assert.Equal(b, item.ID, meta.ID)
 }
 
 func TestTime(t *testing.T) {
@@ -93,7 +93,7 @@ func TestSetAggregateID(t *testing.T) {
 	t.Run("embedded", func(t *testing.T) {
 		item := &Embedded{}
 		setAggregateID(item, aggregateID)
-		assert.Equal(t, aggregateID, item.Model.AggregateID)
+		assert.Equal(t, aggregateID, item.Model.ID)
 	})
 
 	t.Run("tagged", func(t *testing.T) {

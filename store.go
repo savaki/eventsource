@@ -29,13 +29,13 @@ func (m *memoryStore) Save(ctx context.Context, serializer Serializer, events ..
 			return err
 		}
 
-		v, ok := m.aggregates[meta.AggregateID]
+		v, ok := m.aggregates[meta.ID]
 		if !ok {
 			v = make([]EventMeta, 0, len(events))
-			m.aggregates[meta.AggregateID] = v
+			m.aggregates[meta.ID] = v
 		}
 
-		m.aggregates[meta.AggregateID] = append(v, meta)
+		m.aggregates[meta.ID] = append(v, meta)
 	}
 
 	return nil

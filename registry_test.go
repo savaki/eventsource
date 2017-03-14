@@ -37,7 +37,7 @@ func TestRegistry(t *testing.T) {
 		// Test - Add an event to the store and verify we can recreate the object
 
 		err := registry.Save(ctx, OrgNameSet{
-			Model: eventsource.Model{AggregateID: aggregateID, Version: 0},
+			Model: eventsource.Model{ID: aggregateID, Version: 0},
 			Name:  name,
 		})
 		assert.Nil(t, err)
@@ -55,7 +55,7 @@ func TestRegistry(t *testing.T) {
 
 		updated := "Sarah"
 		err = registry.Save(ctx, OrgNameSet{
-			Model: eventsource.Model{AggregateID: aggregateID, Version: 0},
+			Model: eventsource.Model{ID: aggregateID, Version: 0},
 			Name:  updated,
 		})
 		assert.Nil(t, err)
@@ -75,7 +75,7 @@ func TestRegistry(t *testing.T) {
 		registry.BindFunc(OrgNameSet{}, SetOrgName)
 
 		err := registry.Save(ctx, OrgNameSet{
-			Model: eventsource.Model{AggregateID: aggregateID, Version: 0},
+			Model: eventsource.Model{ID: aggregateID, Version: 0},
 			Name:  name,
 		})
 		assert.Nil(t, err)
@@ -91,7 +91,7 @@ func TestRegistry(t *testing.T) {
 		registry.BindFunc(&OrgNameSet{}, SetOrgName)
 
 		err := registry.Save(ctx, OrgNameSet{
-			Model: eventsource.Model{AggregateID: aggregateID, Version: 0},
+			Model: eventsource.Model{ID: aggregateID, Version: 0},
 			Name:  name,
 		})
 		assert.Nil(t, err)

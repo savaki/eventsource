@@ -15,8 +15,8 @@ type EntitySetName struct {
 func TestJSONSerializer(t *testing.T) {
 	event := EntitySetName{
 		Model: eventsource.Model{
-			AggregateID: "123",
-			Version:     456,
+			ID:      "123",
+			Version: 456,
 		},
 		Name: "blah",
 	}

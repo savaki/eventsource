@@ -191,7 +191,7 @@ func makeUpdateItemInput(tableName, hashKey, rangeKey string, eventsPerItem int,
 		input := &dynamodb.UpdateItemInput{
 			TableName: aws.String(tableName),
 			Key: map[string]*dynamodb.AttributeValue{
-				hashKey:  {S: aws.String(partition[0].AggregateID)},
+				hashKey:  {S: aws.String(partition[0].ID)},
 				rangeKey: {N: aws.String(strconv.Itoa(partitionID))},
 			},
 			ExpressionAttributeNames: map[string]*string{

@@ -114,15 +114,15 @@ func TestSave(t *testing.T) {
 			aggregateID := strconv.FormatInt(time.Now().UnixNano(), 10)
 			first := EntitySetFirst{
 				Model: eventsource.Model{
-					AggregateID: aggregateID,
-					Version:     1,
+					ID:      aggregateID,
+					Version: 1,
 				},
 				First: "first",
 			}
 			second := EntitySetLast{
 				Model: eventsource.Model{
-					AggregateID: aggregateID,
-					Version:     2,
+					ID:      aggregateID,
+					Version: 2,
 				},
 				Last: "last",
 			}
@@ -158,15 +158,15 @@ func TestStore_Fetch(t *testing.T) {
 	aggregateID := strconv.FormatInt(time.Now().UnixNano(), 10)
 	first := EntitySetFirst{
 		Model: eventsource.Model{
-			AggregateID: aggregateID,
-			Version:     1,
+			ID:      aggregateID,
+			Version: 1,
 		},
 		First: "first",
 	}
 	second := EntitySetLast{
 		Model: eventsource.Model{
-			AggregateID: aggregateID,
-			Version:     2,
+			ID:      aggregateID,
+			Version: 2,
 		},
 		Last: "last",
 	}

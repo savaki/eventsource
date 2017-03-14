@@ -51,8 +51,8 @@ func main() {
 	id := "123"
 	setFirstEvent := UserNameSet{
 		Model: eventsource.Model{
-			AggregateID: id,
-			Version:     1,
+			ID:      id,
+			Version: 1,
 		},
 		Name: "Joe Public",
 	}
