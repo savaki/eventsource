@@ -5,9 +5,14 @@ import (
 	"sync"
 )
 
+type History struct {
+	Version int
+	Events  []interface{}
+}
+
 type Store interface {
 	Save(ctx context.Context, serializer Serializer, events ...interface{}) error
-	Fetch(ctx context.Context, serializer Serializer, aggregateID string, version int) ([]interface{}, int, error)
+	Fetch(ctx context.Context, serializer Serializer, aggregateID string, version int) (History, error)
 }
 
 type memoryStore struct {
@@ -41,13 +46,13 @@ func (m *memoryStore) Save(ctx context.Context, serializer Serializer, events ..
 	return nil
 }
 
-func (m *memoryStore) Fetch(ctx context.Context, serializer Serializer, aggregateID string, version int) ([]interface{}, int, error) {
+func (m *memoryStore) Fetch(ctx context.Context, serializer Serializer, aggregateID string, version int) (History, error) {
 	v, ok := m.aggregates[aggregateID]
 	if !ok {
-		return nil, 0, ErrNotFound
+		return History{}, ErrNotFound
 	}
 
-	found := 0
+	highestVersion := 0
 
 	events := make([]interface{}, 0, len(v))
 	for _, meta := range v {
@@ -55,8 +60,11 @@ func (m *memoryStore) Fetch(ctx context.Context, serializer Serializer, aggregat
 			break
 		}
 		events = append(events, meta.Event)
-		found = meta.Version
+		highestVersion = meta.Version
 	}
 
-	return events, found, nil
+	return History{
+		Version: highestVersion,
+		Events:  events,
+	}, nil
 }

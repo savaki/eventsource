@@ -82,14 +82,14 @@ func (s *Store) Save(ctx context.Context, serializer eventsource.Serializer, eve
 	}
 }
 
-func (s *Store) Fetch(ctx context.Context, serializer eventsource.Serializer, aggregateID string, version int) ([]interface{}, int, error) {
+func (s *Store) Fetch(ctx context.Context, serializer eventsource.Serializer, aggregateID string, version int) (eventsource.History, error) {
 	if version == 0 {
 		version = math.MaxInt32
 	}
 
 	db, err := s.openFunc()
 	if err != nil {
-		return nil, 0, err
+		return eventsource.History{}, err
 	}
 	defer db.Close()
 
@@ -100,7 +100,7 @@ func (s *Store) Fetch(ctx context.Context, serializer eventsource.Serializer, ag
 	}
 	rows, err := db.QueryContext(ctx, query, aggregateID, version)
 	if err != nil {
-		return nil, 0, err
+		return eventsource.History{}, err
 	}
 	defer rows.Close()
 
@@ -111,13 +111,13 @@ func (s *Store) Fetch(ctx context.Context, serializer eventsource.Serializer, ag
 		data := []byte{}
 		err := rows.Scan(&meta.EventType, &data, &meta.Version, &meta.At)
 		if err != nil {
-			return nil, 0, err
+			return eventsource.History{}, err
 		}
 
 		s.log("Reading version,", meta.Version)
 		event, err := serializer.Deserialize(meta.EventType, data)
 		if err != nil {
-			return nil, 0, err
+			return eventsource.History{}, err
 		}
 		meta.Event = event
 
@@ -128,15 +128,18 @@ func (s *Store) Fetch(ctx context.Context, serializer eventsource.Serializer, ag
 		return metas[i].Version < metas[j].Version
 	})
 
-	foundVersion := 0
+	highestVersion := 0
 	events := make([]interface{}, 0, len(metas))
 	for _, meta := range metas {
 		events = append(events, meta.Event)
-		foundVersion = meta.Version
+		highestVersion = meta.Version
 	}
 
 	s.log("Successfully read", len(events), "events")
-	return events, foundVersion, nil
+	return eventsource.History{
+		Version: highestVersion,
+		Events:  events,
+	}, nil
 }
 
 func (s *Store) log(args ...interface{}) {

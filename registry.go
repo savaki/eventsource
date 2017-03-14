@@ -105,24 +105,25 @@ func (r *Registry) Save(ctx context.Context, events ...interface{}) error {
 	return r.store.Save(ctx, r.serializer, events...)
 }
 
-func (r *Registry) Fetch(ctx context.Context, aggregateID string, version int) ([]interface{}, int, error) {
+func (r *Registry) Fetch(ctx context.Context, aggregateID string, version int) (History, error) {
 	return r.store.Fetch(ctx, r.serializer, aggregateID, version)
 }
 
 func (r *Registry) Load(ctx context.Context, aggregateID string, version int) (interface{}, int, error) {
-	events, version, err := r.Fetch(ctx, aggregateID, version)
+	history, err := r.Fetch(ctx, aggregateID, version)
 	if err != nil {
-		return nil, version, err
+		return nil, 0, err
 	}
 
-	if len(events) == 0 {
+	if len(history.Events) == 0 {
 		return nil, version, errors.New("not found")
 	}
 
-	r.logf("Loaded %v event(s) for aggregate id, %v", len(events), aggregateID)
+	r.logf("Loaded %v event(s) for aggregate id, %v", len(history.Events), aggregateID)
 	v := reflect.New(r.prototype).Interface()
 
-	for _, event := range events {
+	highestVersion := 0
+	for _, event := range history.Events {
 		meta, err := Inspect(event)
 		if err != nil {
 			return nil, version, err
@@ -137,9 +138,11 @@ func (r *Registry) Load(ctx context.Context, aggregateID string, version int) (i
 		if err != nil {
 			return nil, version, err
 		}
+
+		highestVersion = meta.Version
 	}
 
-	return v, version, nil
+	return v, highestVersion, nil
 }
 
 type Option func(registry *Registry)

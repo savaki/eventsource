@@ -59,11 +59,11 @@ func (s *Store) Save(ctx context.Context, serializer eventsource.Serializer, eve
 	return nil
 }
 
-func (s *Store) Fetch(ctx context.Context, serializer eventsource.Serializer, aggregateID string, version int) ([]interface{}, int, error) {
+func (s *Store) Fetch(ctx context.Context, serializer eventsource.Serializer, aggregateID string, version int) (eventsource.History, error) {
 	partition := selectPartition(version, s.eventsPerItem)
 	input, err := makeQueryInput(s.tableName, s.hashKey, s.rangeKey, aggregateID, partition)
 	if err != nil {
-		return nil, 0, err
+		return eventsource.History{}, err
 	}
 
 	metas := make([]eventsource.EventMeta, 0, version)
@@ -72,7 +72,7 @@ func (s *Store) Fetch(ctx context.Context, serializer eventsource.Serializer, ag
 	for {
 		out, err := s.api.Query(input)
 		if err != nil {
-			return nil, 0, err
+			return eventsource.History{}, err
 		}
 
 		if len(out.Items) == 0 {
@@ -98,12 +98,12 @@ func (s *Store) Fetch(ctx context.Context, serializer eventsource.Serializer, ag
 				data := item[dataKey].B
 				event, err := serializer.Deserialize(eventType, data)
 				if err != nil {
-					return nil, 0, err
+					return eventsource.History{}, err
 				}
 
 				meta, err := eventsource.Inspect(event)
 				if err != nil {
-					return nil, 0, err
+					return eventsource.History{}, err
 				}
 
 				metas = append(metas, meta)
@@ -120,14 +120,17 @@ func (s *Store) Fetch(ctx context.Context, serializer eventsource.Serializer, ag
 		return metas[i].Version < metas[j].Version
 	})
 
-	foundVersion := 0
+	highestVersion := 0
 	events := make([]interface{}, 0, version)
 	for _, meta := range metas {
 		events = append(events, meta.Event)
-		foundVersion = meta.Version
+		highestVersion = meta.Version
 	}
 
-	return events, foundVersion, nil
+	return eventsource.History{
+		Version: highestVersion,
+		Events:  events,
+	}, nil
 }
 
 func New(tableName string, opts ...Option) (*Store, error) {
