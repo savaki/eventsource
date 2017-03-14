@@ -15,21 +15,15 @@ const (
 )
 
 var (
-	modelType reflect.Type
-	idField   int
+	errInspectNil       = errors.New("cannot inspect nil")
+	errDuplicateID      = errors.New("duplicate id tag")
+	errDuplicateVersion = errors.New("duplicate version tag")
+	errDuplicateAt      = errors.New("duplicate at tag")
+	errDuplicateType    = errors.New("duplicate type tag")
+	errInvalidID        = errors.New("eventsource id field must be either string or fmt.Stringer")
+	errInvalidAt        = errors.New("eventsource at field must be of type EpochMillis, int64, or time.Time")
+	errInvalidVersion   = errors.New("eventsource version field must be of type int")
 )
-
-func init() {
-	modelType = reflect.TypeOf(Model{})
-
-	for i := 0; i < modelType.NumField(); i++ {
-		field := modelType.Field(i)
-		if field.Name == "AggregateID" {
-			idField = i
-			break
-		}
-	}
-}
 
 type EpochMillis int64
 
@@ -66,114 +60,139 @@ type EventMeta struct {
 }
 
 type Model struct {
-	ID      string
-	Version int
-	At      EpochMillis
+	ID      string      `eventsource:"id"`
+	Version int         `eventsource:"version"`
+	At      EpochMillis `eventsource:"at"`
 }
 
-func Inspect(event interface{}) (EventMeta, error) {
-	meta := EventMeta{
-		Event: event,
-	}
+type inspector struct {
+	HasID        bool
+	HasEventType bool
+	HasVersion   bool
+	HasAt        bool
+	ID           string
+	EventType    string
+	Version      int
+	At           EpochMillis
+}
 
+func (gadget *inspector) inspect(event interface{}) error {
 	if event == nil {
-		return meta, errors.New("cannot inspect nil")
+		return errInspectNil
 	}
 
-	eventType := reflect.TypeOf(event)
-	if eventType.Kind() == reflect.Ptr {
-		eventType = eventType.Elem()
+	t := reflect.TypeOf(event)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
 	}
 
-	eventValue := reflect.ValueOf(event)
-	if eventValue.Kind() == reflect.Ptr {
-		eventValue = eventValue.Elem()
+	value := reflect.ValueOf(event)
+	if value.Kind() == reflect.Ptr {
+		value = value.Elem()
 	}
 
-	hasID := false
-	hasEventType := false
-	hasVersion := false
-	hasAt := false
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		fieldValue := value.Field(i)
 
-	for i := 0; i < eventType.NumField(); i++ {
-		field := eventType.Field(i)
-
-		// Check for embedded Model
-
-		if field.Name == "Model" && field.Type == modelType {
-			if m, ok := eventValue.Field(i).Interface().(Model); ok {
-				meta.ID = m.ID
-				meta.Version = m.Version
-				meta.At = m.At
-
-				hasID = true
-				hasVersion = true
-				hasAt = true
-
-				continue
-			}
-		}
+		// Check for embedded struct
 
 		tag := field.Tag.Get(tagName)
+
 		if tag == "" {
+			if field.Type.Kind() == reflect.Struct && strings.Contains(field.Type.PkgPath(), ".") {
+				err := gadget.inspect(fieldValue.Interface())
+				if err != nil {
+					return err
+				}
+			}
+
 			continue
 		}
 
 		if v := strings.Index(tag, ","); v > 0 {
 			if v := tag[v+1:]; strings.HasPrefix(v, typePrefix) {
-				meta.EventType = v[len(typePrefix):]
-				hasEventType = true
+				gadget.EventType = v[len(typePrefix):]
+				if gadget.HasEventType {
+					return errDuplicateType
+				}
+				gadget.HasEventType = true
 			}
 			tag = tag[0:v]
 		}
 
 		switch tag {
 		case "id":
-			if hasID {
-				return meta, errors.New("duplicate defintion of id found")
+			if gadget.HasID {
+				return errDuplicateID
 			}
-			switch fieldValue := eventValue.Field(i).Interface().(type) {
+
+			switch fieldValue := value.Field(i).Interface().(type) {
 			case string:
-				meta.ID = fieldValue
+				gadget.ID = fieldValue
+
 			case fmt.Stringer:
-				meta.ID = fieldValue.String()
+				gadget.ID = fieldValue.String()
+
 			default:
-				return meta, errors.New("eventsource id field must be either string or fmt.Stringer")
+				return errInvalidID
 			}
-			hasID = true
+			gadget.HasID = true
 
 		case "version":
-			if hasVersion {
-				return meta, errors.New("duplicate defintion of version found")
+			if gadget.HasVersion {
+				return errDuplicateVersion
 			}
-			switch fieldValue := eventValue.Field(i).Interface().(type) {
+			switch fieldValue := value.Field(i).Interface().(type) {
 			case int:
-				meta.Version = fieldValue
+				gadget.Version = fieldValue
 			default:
-				return meta, errors.New("eventsource version field must be of type int")
+				return errInvalidVersion
 			}
-			hasVersion = true
+			gadget.HasVersion = true
 
 		case "at":
-			if hasAt {
-				return meta, errors.New("duplicate defintion of at found")
+			if gadget.HasAt {
+				return errDuplicateAt
 			}
-			switch fieldValue := eventValue.Field(i).Interface().(type) {
+			switch fieldValue := value.Field(i).Interface().(type) {
 			case EpochMillis:
-				meta.At = fieldValue
+				gadget.At = fieldValue
 			case int64:
-				meta.At = EpochMillis(fieldValue)
+				gadget.At = EpochMillis(fieldValue)
 			case time.Time:
-				meta.At = Time(fieldValue)
+				gadget.At = Time(fieldValue)
 			default:
-				return meta, errors.New("eventsource version field must be of type int64 or time.Time")
+				return errInvalidAt
 			}
-			hasAt = true
+			gadget.HasAt = true
 		}
 	}
 
-	if !hasEventType {
-		meta.EventType = eventType.Name()
+	return nil
+}
+
+func Inspect(event interface{}) (EventMeta, error) {
+	gadget := &inspector{}
+	err := gadget.inspect(event)
+	if err != nil {
+		return EventMeta{}, err
+	}
+
+	meta := EventMeta{
+		ID:        gadget.ID,
+		EventType: gadget.EventType,
+		Event:     event,
+		Version:   gadget.Version,
+		At:        gadget.At,
+	}
+
+	if meta.EventType == "" {
+		t := reflect.TypeOf(event)
+		if t.Kind() == reflect.Ptr {
+			t = t.Elem()
+		}
+		meta.EventType = t.Name()
 	}
 
 	return meta, nil
