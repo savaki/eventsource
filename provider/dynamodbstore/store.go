@@ -24,8 +24,8 @@ const (
 )
 
 const (
-	eventTypePrefix = "_t"
-	dataPrefix      = "_d"
+	EventTypePrefix = "_t"
+	DataPrefix      = "_d"
 )
 
 // Store represents a dynamodb backed eventsource.Store
@@ -82,19 +82,19 @@ func (s *Store) Fetch(ctx context.Context, serializer eventsource.Serializer, ag
 		// events are stored within av as _t{version} = {event-type}, _d{version} = {serialized event}
 		for _, item := range out.Items {
 			for key, av := range item {
-				if !strings.HasPrefix(key, eventTypePrefix) {
+				if !strings.HasPrefix(key, EventTypePrefix) {
 					continue
 				}
 
 				if version > 0 {
-					if v, err := strconv.Atoi(key[len(eventTypePrefix):]); err != nil || v > version {
+					if v, err := strconv.Atoi(key[len(EventTypePrefix):]); err != nil || v > version {
 						continue
 					}
 				}
 
 				eventType := *av.S
 
-				dataKey := dataPrefix + key[len(eventTypePrefix):]
+				dataKey := DataPrefix + key[len(EventTypePrefix):]
 				data := item[dataKey].B
 				event, err := serializer.Deserialize(eventType, data)
 				if err != nil {
@@ -223,9 +223,9 @@ func makeUpdateItemInput(tableName, hashKey, rangeKey string, eventsPerItem int,
 					return nil, err
 				}
 
-				key := dataPrefix + version
-				nameRef := "#" + dataPrefix + version
-				valueRef := ":" + dataPrefix + version
+				key := DataPrefix + version
+				nameRef := "#" + DataPrefix + version
+				valueRef := ":" + DataPrefix + version
 
 				if index > 0 {
 					io.WriteString(condExpr, " AND ")
@@ -240,9 +240,9 @@ func makeUpdateItemInput(tableName, hashKey, rangeKey string, eventsPerItem int,
 			// Store the event type
 			{
 
-				key := eventTypePrefix + version
-				nameRef := "#" + eventTypePrefix + version
-				valueRef := ":" + eventTypePrefix + version
+				key := EventTypePrefix + version
+				nameRef := "#" + EventTypePrefix + version
+				valueRef := ":" + EventTypePrefix + version
 				fmt.Fprintf(updateExpr, ", %v = %v", nameRef, valueRef)
 				input.ExpressionAttributeNames[nameRef] = aws.String(key)
 				input.ExpressionAttributeValues[valueRef] = &dynamodb.AttributeValue{S: aws.String(meta.EventType)}
