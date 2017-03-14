@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -32,6 +33,14 @@ func init() {
 
 type EpochMillis int64
 
+func (e EpochMillis) Int64() int64 {
+	return int64(e)
+}
+
+func (e EpochMillis) String() string {
+	return strconv.FormatInt(int64(e), 10)
+}
+
 func (e EpochMillis) Time() time.Time {
 	seconds := int64(e) / 1e3
 	millis := int64(e) % 1e3
@@ -39,9 +48,12 @@ func (e EpochMillis) Time() time.Time {
 }
 
 func Now() EpochMillis {
-	now := time.Now()
-	seconds := now.Unix() * 1e3
-	millis := int64(now.Nanosecond()) / 1e6
+	return Time(time.Now())
+}
+
+func Time(t time.Time) EpochMillis {
+	seconds := t.Unix() * 1e3
+	millis := int64(t.Nanosecond()) / 1e6
 	return EpochMillis(seconds + millis)
 }
 
@@ -140,7 +152,7 @@ func Inspect(event interface{}) (EventMeta, error) {
 			default:
 				return meta, errors.New("eventsource version field must be of type int")
 			}
-			hasAt = hasVersion
+			hasVersion = true
 
 		case "at":
 			if hasAt {
@@ -165,59 +177,4 @@ func Inspect(event interface{}) (EventMeta, error) {
 	}
 
 	return meta, nil
-}
-
-func Time(t time.Time) EpochMillis {
-	seconds := t.Unix()
-	millis := int64(t.Nanosecond()) / 1e6
-	return EpochMillis(seconds*1e3 + millis)
-}
-
-func setAggregateID(aggregate interface{}, aggregateID string) error {
-	t := reflect.TypeOf(aggregate)
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-
-	eventValue := reflect.ValueOf(aggregate)
-	if eventValue.Kind() == reflect.Ptr {
-		eventValue = eventValue.Elem()
-	}
-
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-
-		// Check for embedded Model
-
-		if field.Name == "Model" && field.Type == modelType {
-			idField := eventValue.Field(i).Field(idField)
-			if idField.CanSet() {
-				idField.SetString(aggregateID)
-				return nil
-			}
-		}
-
-		// Otherwise, look for tagged field
-
-		tag := field.Tag.Get(tagName)
-		if tag == "" {
-			continue
-		}
-
-		if v := strings.Index(tag, ","); v > 0 {
-			tag = tag[0:v]
-		}
-
-		if tag != "id" {
-			continue
-		}
-
-		idField := eventValue.Field(i)
-		if idField.CanSet() {
-			idField.SetString(aggregateID)
-			return nil
-		}
-	}
-
-	return errors.New("unable to set id")
 }

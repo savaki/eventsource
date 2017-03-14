@@ -68,7 +68,7 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	v, version, err := userEvents.Load(ctx, id)
+	v, version, err := userEvents.Load(ctx, id, 0)
 	if err != nil {
 		log.Fatalln(err)
 	}

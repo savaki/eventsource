@@ -3,7 +3,11 @@ package eventsource
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"reflect"
+	"strings"
+	"time"
 )
 
 type EventHandlerFunc func(ctx context.Context, aggregate, event interface{}) error
@@ -22,6 +26,8 @@ type Registry struct {
 	serializer Serializer
 	handlers   map[string]EventHandler
 	types      map[string]reflect.Type
+	writer     io.Writer
+	debug      bool
 }
 
 func New(prototype interface{}, opts ...Option) *Registry {
@@ -45,6 +51,21 @@ func New(prototype interface{}, opts ...Option) *Registry {
 	return r
 }
 
+func (r *Registry) logf(format string, args ...interface{}) {
+	if !r.debug {
+		return
+	}
+
+	now := time.Now().Format(time.StampMilli)
+	io.WriteString(r.writer, now)
+	io.WriteString(r.writer, " ")
+
+	fmt.Fprintf(r.writer, format, args...)
+	if !strings.HasSuffix(format, "\n") {
+		io.WriteString(r.writer, "\n")
+	}
+}
+
 func (r *Registry) BindFunc(event interface{}, h EventHandlerFunc) error {
 	return r.Bind(event, h)
 }
@@ -63,6 +84,8 @@ func (r *Registry) Bind(event interface{}, h EventHandler) error {
 	if err != nil {
 		return err
 	}
+
+	r.logf("Binding %12s => %#v", meta.EventType, event)
 
 	if _, ok := r.handlers[meta.EventType]; ok {
 		return errors.New("handler already defined")
@@ -86,11 +109,7 @@ func (r *Registry) Fetch(ctx context.Context, aggregateID string, version int) (
 	return r.store.Fetch(ctx, r.serializer, aggregateID, version)
 }
 
-func (r *Registry) Load(ctx context.Context, aggregateID string) (interface{}, int, error) {
-	return r.LoadVersion(ctx, aggregateID, 0)
-}
-
-func (r *Registry) LoadVersion(ctx context.Context, aggregateID string, version int) (interface{}, int, error) {
+func (r *Registry) Load(ctx context.Context, aggregateID string, version int) (interface{}, int, error) {
 	events, version, err := r.Fetch(ctx, aggregateID, version)
 	if err != nil {
 		return nil, version, err
@@ -100,11 +119,8 @@ func (r *Registry) LoadVersion(ctx context.Context, aggregateID string, version 
 		return nil, version, errors.New("not found")
 	}
 
+	r.logf("Loaded %v event(s) for aggregate id, %v", len(events), aggregateID)
 	v := reflect.New(r.prototype).Interface()
-	err = setAggregateID(v, aggregateID)
-	if err != nil {
-		return nil, version, err
-	}
 
 	for _, event := range events {
 		meta, err := Inspect(event)
@@ -137,5 +153,12 @@ func WithStore(store Store) Option {
 func WithSerializer(serializer Serializer) Option {
 	return func(registry *Registry) {
 		registry.serializer = serializer
+	}
+}
+
+func WithDebug(w io.Writer) Option {
+	return func(registry *Registry) {
+		registry.debug = true
+		registry.writer = w
 	}
 }

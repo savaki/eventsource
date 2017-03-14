@@ -51,7 +51,7 @@ func (m *memoryStore) Fetch(ctx context.Context, serializer Serializer, aggregat
 
 	events := make([]interface{}, 0, len(v))
 	for _, meta := range v {
-		if meta.Version > version {
+		if version > 0 && meta.Version > version {
 			break
 		}
 		events = append(events, meta.Event)

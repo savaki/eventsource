@@ -87,22 +87,6 @@ func TestTime(t *testing.T) {
 	assert.Equal(t, now.Format(time.StampMilli), epoch.Time().Format(time.StampMilli))
 }
 
-func TestSetAggregateID(t *testing.T) {
-	aggregateID := "123"
-
-	t.Run("embedded", func(t *testing.T) {
-		item := &Embedded{}
-		setAggregateID(item, aggregateID)
-		assert.Equal(t, aggregateID, item.Model.ID)
-	})
-
-	t.Run("tagged", func(t *testing.T) {
-		item := &Tagged{}
-		setAggregateID(item, aggregateID)
-		assert.Equal(t, aggregateID, item.ID)
-	})
-}
-
 func TestNow(t *testing.T) {
 	delta := Now().Time().Sub(time.Now())
 	if delta < 0 {
