@@ -43,6 +43,61 @@ type EntitySetLast struct {
 	Last string
 }
 
+func TestIsKey(t *testing.T) {
+	testCases := map[string]struct {
+		Key      string
+		Expected bool
+	}{
+		"simple": {
+			Key:      "_d1",
+			Expected: true,
+		},
+		"failed": {
+			Key:      "d1",
+			Expected: false,
+		},
+	}
+
+	for label, tc := range testCases {
+		t.Run(label, func(t *testing.T) {
+			assert.Equal(t, tc.Expected, dynamodbstore.IsKey(tc.Key))
+		})
+	}
+}
+
+func TestVersionFromKey(t *testing.T) {
+	testCases := map[string]struct {
+		Key     string
+		Version int
+		HasErr  bool
+	}{
+		"simple": {
+			Key:     "_d1",
+			Version: 1,
+		},
+		"larger": {
+			Key:     "_d1234",
+			Version: 1234,
+		},
+		"empty": {
+			Key:    "_d",
+			HasErr: true,
+		},
+		"bad": {
+			Key:    "_dabc",
+			HasErr: true,
+		},
+	}
+
+	for label, tc := range testCases {
+		t.Run(label, func(t *testing.T) {
+			version, err := dynamodbstore.VersionFromKey(tc.Key)
+			assert.True(t, tc.HasErr == (err != nil))
+			assert.Equal(t, tc.Version, version)
+		})
+	}
+}
+
 func fetchPartitions(api *dynamodb.DynamoDB, tableName, key string) ([]string, error) {
 	var startKey map[string]*dynamodb.AttributeValue
 
