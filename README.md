@@ -19,67 +19,77 @@ import (
 	"log"
 
 	"github.com/savaki/eventsource"
-	"github.com/savaki/eventsource/provider/dynamodbstore"
 )
 
-// User represents out domain model
 type User struct {
-	ID    string `eventsource:"id"`
-	First string
-	Last  string
+	ID      string
+	Version int
+	Name    string
+	Email   string
+}
+
+// UserCreated defines a user creation event
+type UserCreated struct {
+	eventsource.Model
 }
 
 // UserFirstSet defines an event by simple struct embedding
-type UserFirstSet struct {
+type UserNameSet struct {
 	eventsource.Model
-	First string
+	Name string
 }
 
 // UserLastSet defines an event via tags
-type UserLastSet struct {
+type UserEmailSet struct {
 	ID      string `eventsource:"id,type:user-last-set"`
 	Version int    `eventsource:"version"`
-	Last    string
+	Email   string
 }
 
-func SetFirst(_ context.Context, aggregate, event interface{}) error {
-	user := aggregate.(*User)
-	v := event.(UserFirstSet)
+func (item *User) Apply(event interface{}) bool {
+	switch v := event.(type) {
+	case *UserCreated:
+		item.Version = v.Model.Version
+		item.ID = v.Model.ID
 
-	user.First = v.First
-	return nil
-}
+	case *UserNameSet:
+		item.Version = v.Model.Version
+		item.Name = v.Name
 
-func SetLast(_ context.Context, aggregate, event interface{}) error {
-	user := aggregate.(*User)
-	v := event.(UserLastSet)
+	case *UserEmailSet:
+		item.Version = v.Version
+		item.Email = v.Email
 
-	user.Last = v.Last
-	return nil
+	default:
+		return false
+	}
+
+	return true
 }
 
 func main() {
-	store, err := dynamodbstore.New("user_events", dynamodbstore.WithRegion("us-west-2"))
+	userEvents := eventsource.New(&User{})
+	err := userEvents.Bind(
+		UserCreated{},
+		UserNameSet{},
+		UserEmailSet{},
+	)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	userEvents := eventsource.New(User{}, eventsource.WithStore(store))
-	userEvents.BindFunc(UserFirstSet{}, SetFirst)
-	userEvents.BindFunc(UserLastSet{}, SetLast)
-
 	id := "123"
-	setFirstEvent := UserFirstSet{
+	setFirstEvent := &UserNameSet{
 		Model: eventsource.Model{
-			AggregateID: id,
-			Version:     1,
+			ID:      id,
+			Version: 1,
 		},
-		First: "Joe",
+		Name: "Joe Public",
 	}
-	setLastEvent := UserLastSet{
+	setLastEvent := &UserEmailSet{
 		ID:      id,
 		Version: 2,
-		Last:    "Public",
+		Email:   "joe.public@example.com",
 	}
 
 	ctx := context.Background()
@@ -88,13 +98,13 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	v, version, err := userEvents.Load(ctx, id)
+	v, err := userEvents.Load(ctx, id)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	user := v.(*User)
-	fmt.Printf("Hello %v %v [Version %v]\n", user.First, user.Last, version) // prints "Hello Joe Public [1]"
+	fmt.Printf("Hello %v %v\n", user.Name, user.Email) // prints "Hello Joe Public joe.public@example.com"
 }
 ```
 

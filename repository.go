@@ -10,27 +10,24 @@ import (
 	"time"
 )
 
-type EventHandlerFunc func(ctx context.Context, aggregate, event interface{}) error
+const (
+	msgUnhandledEvent = "aggregate was unable to handle event"
+)
 
-func (fn EventHandlerFunc) HandleEvent(ctx context.Context, aggregate, event interface{}) error {
-	return fn(ctx, aggregate, event)
-}
-
-type EventHandler interface {
-	HandleEvent(ctx context.Context, aggregate, event interface{}) error
+type Aggregate interface {
+	Apply(event interface{}) bool
 }
 
 type Repository struct {
 	prototype  reflect.Type
 	store      Store
 	serializer Serializer
-	handlers   map[string]EventHandler
 	types      map[string]reflect.Type
 	writer     io.Writer
 	debug      bool
 }
 
-func New(prototype interface{}, opts ...Option) *Repository {
+func New(prototype Aggregate, opts ...Option) *Repository {
 	t := reflect.TypeOf(prototype)
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
@@ -40,7 +37,6 @@ func New(prototype interface{}, opts ...Option) *Repository {
 		prototype:  t,
 		store:      newMemoryStore(),
 		serializer: JSONSerializer(),
-		handlers:   map[string]EventHandler{},
 		types:      map[string]reflect.Type{},
 	}
 
@@ -66,38 +62,32 @@ func (r *Repository) logf(format string, args ...interface{}) {
 	}
 }
 
-func (r *Repository) BindFunc(event interface{}, h EventHandlerFunc) error {
-	return r.Bind(event, h)
-}
+func (r *Repository) Bind(events ...interface{}) error {
+	for _, event := range events {
+		if event == nil {
+			return errors.New("attempt to bind nil event")
+		}
 
-func (r *Repository) Bind(event interface{}, h EventHandler) error {
-	if event == nil {
-		return errors.New("attempt to bind nil event")
+		err := r.serializer.Bind(event)
+		if err != nil {
+			return err
+		}
+
+		meta, err := Inspect(event)
+		if err != nil {
+			return err
+		}
+
+		r.logf("Binding %12s => %#v", meta.EventType, event)
+
+		eventType := reflect.TypeOf(event)
+		if eventType.Kind() == reflect.Ptr {
+			eventType = eventType.Elem()
+		}
+
+		r.types[meta.EventType] = eventType
 	}
 
-	err := r.serializer.Bind(event)
-	if err != nil {
-		return err
-	}
-
-	meta, err := Inspect(event)
-	if err != nil {
-		return err
-	}
-
-	r.logf("Binding %12s => %#v", meta.EventType, event)
-
-	if _, ok := r.handlers[meta.EventType]; ok {
-		return errors.New("handler already defined")
-	}
-
-	eventType := reflect.TypeOf(event)
-	if eventType.Kind() == reflect.Ptr {
-		eventType = eventType.Elem()
-	}
-
-	r.types[meta.EventType] = eventType
-	r.handlers[meta.EventType] = h
 	return nil
 }
 
@@ -105,44 +95,33 @@ func (r *Repository) Save(ctx context.Context, events ...interface{}) error {
 	return r.store.Save(ctx, r.serializer, events...)
 }
 
-func (r *Repository) Fetch(ctx context.Context, aggregateID string, version int) (History, error) {
-	return r.store.Fetch(ctx, r.serializer, aggregateID, version)
-}
-
-func (r *Repository) Load(ctx context.Context, aggregateID string, version int) (interface{}, int, error) {
-	history, err := r.Fetch(ctx, aggregateID, version)
+func (r *Repository) Load(ctx context.Context, aggregateID string) (interface{}, error) {
+	history, err := r.store.Fetch(ctx, r.serializer, aggregateID, 0)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
 	if len(history.Events) == 0 {
-		return nil, version, errors.New("not found")
+		return nil, errors.New("not found")
 	}
 
 	r.logf("Loaded %v event(s) for aggregate id, %v", len(history.Events), aggregateID)
 	v := reflect.New(r.prototype).Interface()
 
-	highestVersion := 0
+	aggregate := v.(Aggregate) // v is guaranteed to be an Aggregate
+
 	for _, event := range history.Events {
-		meta, err := Inspect(event)
-		if err != nil {
-			return nil, version, err
-		}
-
-		h, ok := r.handlers[meta.EventType]
+		ok := aggregate.Apply(event)
 		if !ok {
-			return nil, version, errors.New("no handler bound")
+			meta, err := Inspect(event)
+			if err == nil {
+				return nil, errors.New(msgUnhandledEvent + " - " + meta.EventType)
+			}
+			return nil, errors.New(msgUnhandledEvent)
 		}
-
-		err = h.HandleEvent(ctx, v, event)
-		if err != nil {
-			return nil, version, err
-		}
-
-		highestVersion = meta.Version
 	}
 
-	return v, highestVersion, nil
+	return aggregate, nil
 }
 
 type Option func(registry *Repository)

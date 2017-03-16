@@ -10,6 +10,7 @@ import (
 )
 
 type Org struct {
+	Version   int
 	ID        string
 	Name      string
 	CreatedAt eventsource.EpochMillis
@@ -26,21 +27,24 @@ type OrgNameSet struct {
 	Name string
 }
 
-func CreateOrg(_ context.Context, aggregate, event interface{}) error {
-	e := event.(*OrgCreated)
-	org := aggregate.(*Org)
-	org.ID = e.Model.ID
-	org.CreatedAt = e.Model.At
-	org.UpdatedAt = e.Model.At
-	return nil
-}
+func (item *Org) Apply(event interface{}) bool {
+	switch v := event.(type) {
+	case *OrgCreated:
+		item.Version = v.Model.Version
+		item.ID = v.Model.ID
+		item.CreatedAt = v.Model.At
+		item.UpdatedAt = v.Model.At
 
-func SetOrgName(_ context.Context, aggregate, event interface{}) error {
-	e := event.(*OrgNameSet)
-	org := aggregate.(*Org)
-	org.Name = e.Name
-	org.UpdatedAt = e.Model.At
-	return nil
+	case *OrgNameSet:
+		item.Version = v.Model.Version
+		item.Name = v.Name
+		item.UpdatedAt = v.Model.At
+
+	default:
+		return false
+	}
+
+	return true
 }
 
 func TestRegistry(t *testing.T) {
@@ -49,9 +53,9 @@ func TestRegistry(t *testing.T) {
 	name := "Jones"
 
 	t.Run("simple", func(t *testing.T) {
-		registry := eventsource.New(Org{}, eventsource.WithDebug(os.Stdout))
-		registry.BindFunc(OrgCreated{}, CreateOrg)
-		registry.BindFunc(OrgNameSet{}, SetOrgName)
+		registry := eventsource.New(&Org{}, eventsource.WithDebug(os.Stdout))
+		registry.Bind(OrgCreated{})
+		registry.Bind(OrgNameSet{})
 
 		// Test - Add an event to the store and verify we can recreate the object
 
@@ -66,9 +70,8 @@ func TestRegistry(t *testing.T) {
 		)
 		assert.Nil(t, err)
 
-		v, version, err := registry.Load(ctx, id, 0)
+		v, err := registry.Load(ctx, id)
 		assert.Nil(t, err)
-		assert.Equal(t, 1, version)
 
 		org, ok := v.(*Org)
 		assert.True(t, ok)
@@ -84,9 +87,8 @@ func TestRegistry(t *testing.T) {
 		})
 		assert.Nil(t, err)
 
-		v, version, err = registry.Load(ctx, id, 0)
+		v, err = registry.Load(ctx, id)
 		assert.Nil(t, err)
-		assert.Equal(t, 2, version)
 
 		org, ok = v.(*Org)
 		assert.True(t, ok)
@@ -96,8 +98,8 @@ func TestRegistry(t *testing.T) {
 
 	t.Run("with pointer prototype", func(t *testing.T) {
 		registry := eventsource.New(&Org{})
-		registry.BindFunc(OrgCreated{}, CreateOrg)
-		registry.BindFunc(OrgNameSet{}, SetOrgName)
+		registry.Bind(OrgCreated{})
+		registry.Bind(OrgNameSet{})
 
 		err := registry.Save(ctx,
 			&OrgCreated{
@@ -110,15 +112,14 @@ func TestRegistry(t *testing.T) {
 		)
 		assert.Nil(t, err)
 
-		v, version, err := registry.Load(ctx, id, 0)
+		v, err := registry.Load(ctx, id)
 		assert.Nil(t, err)
-		assert.Equal(t, 1, version)
 		assert.Equal(t, name, v.(*Org).Name)
 	})
 
 	t.Run("with pointer bind", func(t *testing.T) {
-		registry := eventsource.New(Org{})
-		registry.BindFunc(&OrgNameSet{}, SetOrgName)
+		registry := eventsource.New(&Org{})
+		registry.Bind(&OrgNameSet{})
 
 		err := registry.Save(ctx,
 			&OrgNameSet{
@@ -128,9 +129,8 @@ func TestRegistry(t *testing.T) {
 		)
 		assert.Nil(t, err)
 
-		v, version, err := registry.Load(ctx, id, 0)
+		v, err := registry.Load(ctx, id)
 		assert.Nil(t, err)
-		assert.Equal(t, 0, version)
 		assert.Equal(t, name, v.(*Org).Name)
 	})
 }
@@ -139,8 +139,8 @@ func TestAt(t *testing.T) {
 	ctx := context.Background()
 	id := "123"
 
-	registry := eventsource.New(Org{}, eventsource.WithDebug(os.Stdout))
-	registry.BindFunc(OrgCreated{}, CreateOrg)
+	registry := eventsource.New(&Org{}, eventsource.WithDebug(os.Stdout))
+	registry.Bind(OrgCreated{})
 	err := registry.Save(ctx,
 		&OrgCreated{
 			Model: eventsource.Model{ID: id, Version: 1, At: eventsource.Now()},
@@ -148,9 +148,8 @@ func TestAt(t *testing.T) {
 	)
 	assert.Nil(t, err)
 
-	v, version, err := registry.Load(ctx, id, 0)
+	v, err := registry.Load(ctx, id)
 	assert.Nil(t, err)
-	assert.Equal(t, 1, version)
 
 	org := v.(*Org)
 	assert.NotZero(t, org.CreatedAt)

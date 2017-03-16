@@ -9,9 +9,15 @@ import (
 )
 
 type User struct {
-	ID    string `eventsource:"id"`
-	Name  string
-	Email string
+	ID      string
+	Version int
+	Name    string
+	Email   string
+}
+
+// UserCreated defines a user creation event
+type UserCreated struct {
+	eventsource.Model
 }
 
 // UserFirstSet defines an event by simple struct embedding
@@ -27,52 +33,63 @@ type UserEmailSet struct {
 	Email   string
 }
 
-func SetName(_ context.Context, aggregate, event interface{}) error {
-	user := aggregate.(*User)
-	v := event.(*UserNameSet)
+func (item *User) Apply(event interface{}) bool {
+	switch v := event.(type) {
+	case *UserCreated:
+		item.Version = v.Model.Version
+		item.ID = v.Model.ID
 
-	user.Name = v.Name
-	return nil
-}
+	case *UserNameSet:
+		item.Version = v.Model.Version
+		item.Name = v.Name
 
-func SetEmail(_ context.Context, aggregate, event interface{}) error {
-	user := aggregate.(*User)
-	v := event.(*UserEmailSet)
+	case *UserEmailSet:
+		item.Version = v.Version
+		item.Email = v.Email
 
-	user.Email = v.Email
-	return nil
+	default:
+		return false
+	}
+
+	return true
 }
 
 func main() {
-	userEvents := eventsource.New(User{})
-	userEvents.BindFunc(UserNameSet{}, SetName)
-	userEvents.BindFunc(UserEmailSet{}, SetEmail)
+	userEvents := eventsource.New(&User{})
+	err := userEvents.Bind(
+		UserCreated{},
+		UserNameSet{},
+		UserEmailSet{},
+	)
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	id := "123"
-	setFirstEvent := UserNameSet{
+	setFirstEvent := &UserNameSet{
 		Model: eventsource.Model{
 			ID:      id,
 			Version: 1,
 		},
 		Name: "Joe Public",
 	}
-	setLastEvent := UserEmailSet{
+	setLastEvent := &UserEmailSet{
 		ID:      id,
 		Version: 2,
 		Email:   "joe.public@example.com",
 	}
 
 	ctx := context.Background()
-	err := userEvents.Save(ctx, setFirstEvent, setLastEvent)
+	err = userEvents.Save(ctx, setFirstEvent, setLastEvent)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	v, version, err := userEvents.Load(ctx, id, 0)
+	v, err := userEvents.Load(ctx, id)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	user := v.(*User)
-	fmt.Printf("Hello %v %v [Version %v]\n", user.Name, user.Email, version) // prints "Hello Joe Public joe.public@example.com [Version 2]"
+	fmt.Printf("Hello %v %v\n", user.Name, user.Email) // prints "Hello Joe Public joe.public@example.com"
 }
