@@ -20,7 +20,7 @@ type EventHandler interface {
 	HandleEvent(ctx context.Context, aggregate, event interface{}) error
 }
 
-type Registry struct {
+type Repository struct {
 	prototype  reflect.Type
 	store      Store
 	serializer Serializer
@@ -30,13 +30,13 @@ type Registry struct {
 	debug      bool
 }
 
-func New(prototype interface{}, opts ...Option) *Registry {
+func New(prototype interface{}, opts ...Option) *Repository {
 	t := reflect.TypeOf(prototype)
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
 
-	r := &Registry{
+	r := &Repository{
 		prototype:  t,
 		store:      newMemoryStore(),
 		serializer: JSONSerializer(),
@@ -51,7 +51,7 @@ func New(prototype interface{}, opts ...Option) *Registry {
 	return r
 }
 
-func (r *Registry) logf(format string, args ...interface{}) {
+func (r *Repository) logf(format string, args ...interface{}) {
 	if !r.debug {
 		return
 	}
@@ -66,11 +66,11 @@ func (r *Registry) logf(format string, args ...interface{}) {
 	}
 }
 
-func (r *Registry) BindFunc(event interface{}, h EventHandlerFunc) error {
+func (r *Repository) BindFunc(event interface{}, h EventHandlerFunc) error {
 	return r.Bind(event, h)
 }
 
-func (r *Registry) Bind(event interface{}, h EventHandler) error {
+func (r *Repository) Bind(event interface{}, h EventHandler) error {
 	if event == nil {
 		return errors.New("attempt to bind nil event")
 	}
@@ -101,15 +101,15 @@ func (r *Registry) Bind(event interface{}, h EventHandler) error {
 	return nil
 }
 
-func (r *Registry) Save(ctx context.Context, events ...interface{}) error {
+func (r *Repository) Save(ctx context.Context, events ...interface{}) error {
 	return r.store.Save(ctx, r.serializer, events...)
 }
 
-func (r *Registry) Fetch(ctx context.Context, aggregateID string, version int) (History, error) {
+func (r *Repository) Fetch(ctx context.Context, aggregateID string, version int) (History, error) {
 	return r.store.Fetch(ctx, r.serializer, aggregateID, version)
 }
 
-func (r *Registry) Load(ctx context.Context, aggregateID string, version int) (interface{}, int, error) {
+func (r *Repository) Load(ctx context.Context, aggregateID string, version int) (interface{}, int, error) {
 	history, err := r.Fetch(ctx, aggregateID, version)
 	if err != nil {
 		return nil, 0, err
@@ -145,22 +145,22 @@ func (r *Registry) Load(ctx context.Context, aggregateID string, version int) (i
 	return v, highestVersion, nil
 }
 
-type Option func(registry *Registry)
+type Option func(registry *Repository)
 
 func WithStore(store Store) Option {
-	return func(registry *Registry) {
+	return func(registry *Repository) {
 		registry.store = store
 	}
 }
 
 func WithSerializer(serializer Serializer) Option {
-	return func(registry *Registry) {
+	return func(registry *Repository) {
 		registry.serializer = serializer
 	}
 }
 
 func WithDebug(w io.Writer) Option {
-	return func(registry *Registry) {
+	return func(registry *Repository) {
 		registry.debug = true
 		registry.writer = w
 	}
