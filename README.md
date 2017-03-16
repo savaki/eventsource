@@ -21,13 +21,6 @@ import (
 	"github.com/savaki/eventsource"
 )
 
-type User struct {
-	ID      string
-	Version int
-	Name    string
-	Email   string
-}
-
 // UserCreated defines a user creation event
 type UserCreated struct {
 	eventsource.Model
@@ -43,6 +36,13 @@ type UserNameSet struct {
 type UserEmailSet struct {
 	ID      string `eventsource:"id,type:user-last-set"`
 	Version int    `eventsource:"version"`
+	Email   string
+}
+
+type User struct {
+	ID      string
+	Version int
+	Name    string
 	Email   string
 }
 
@@ -79,21 +79,18 @@ func main() {
 	}
 
 	id := "123"
-	setFirstEvent := &UserNameSet{
-		Model: eventsource.Model{
-			ID:      id,
-			Version: 1,
-		},
-		Name: "Joe Public",
+	setNameEvent := &UserNameSet{
+		Model: eventsource.Model{ID: id, Version: 1},
+		Name:  "Joe Public",
 	}
-	setLastEvent := &UserEmailSet{
+	setEmailEvent := &UserEmailSet{
 		ID:      id,
 		Version: 2,
 		Email:   "joe.public@example.com",
 	}
 
 	ctx := context.Background()
-	err = userEvents.Save(ctx, setFirstEvent, setLastEvent)
+	err = userEvents.Save(ctx, setEmailEvent, setNameEvent)
 	if err != nil {
 		log.Fatalln(err)
 	}
