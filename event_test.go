@@ -11,6 +11,16 @@ type Embedded struct {
 	Model
 }
 
+type CustomModel struct {
+	ID      string      `eventsource:"id"`
+	Version int         `eventsource:"version"`
+	At      EpochMillis `eventsource:"at"`
+}
+
+type EmbeddedCustom struct {
+	CustomModel
+}
+
 type Tagged struct {
 	ID        string    `eventsource:"id,type:blah"`
 	Revision  int       `eventsource:"version"`
@@ -46,6 +56,22 @@ func TestInspect(t *testing.T) {
 		assert.Equal(t, "blah", meta.EventType)
 		assert.Equal(t, item.Revision, meta.Version)
 		assert.Equal(t, item.CreatedAt.Unix(), meta.At.Time().Unix())
+	})
+
+	t.Run("custom", func(t *testing.T) {
+		item := EmbeddedCustom{
+			CustomModel: CustomModel{
+				ID:      "123",
+				Version: 4,
+				At:      567,
+			},
+		}
+		meta, err := Inspect(item)
+		assert.Nil(t, err)
+		assert.Equal(t, item.ID, meta.ID)
+		assert.Equal(t, "EmbeddedCustom", meta.EventType)
+		assert.Equal(t, item.Version, meta.Version)
+		assert.Equal(t, item.At, meta.At)
 	})
 }
 
