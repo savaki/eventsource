@@ -100,7 +100,8 @@ func (gadget *inspector) inspect(event interface{}) error {
 		tag := field.Tag.Get(tagName)
 
 		if tag == "" {
-			if field.Type.Kind() == reflect.Struct {
+			switch field.Type.Kind() {
+			case reflect.Struct, reflect.Interface:
 				err := gadget.inspect(fieldValue.Interface())
 				if err != nil {
 					return err

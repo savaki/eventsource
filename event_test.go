@@ -89,6 +89,27 @@ func TestInspect(t *testing.T) {
 		assert.Equal(t, item.Version, meta.Version)
 		assert.Equal(t, item.At, meta.At)
 	})
+
+	t.Run("interface", func(t *testing.T) {
+		item := func() interface{} {
+			return &Embedded{
+				Model: Model{
+					ID:      "123",
+					Version: 4,
+					At:      567,
+				},
+			}
+		}()
+
+		func(in interface{}) {
+			meta, err := Inspect(in)
+			assert.Nil(t, err)
+			assert.Equal(t, "123", meta.ID)
+			assert.Equal(t, "Embedded", meta.EventType)
+			assert.Equal(t, 4, meta.Version)
+			assert.Equal(t, EpochMillis(567), meta.At)
+		}(item)
+	})
 }
 
 var (
