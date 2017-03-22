@@ -27,7 +27,7 @@ type OrgNameSet struct {
 	Name string
 }
 
-func (item *Org) Apply(event interface{}) bool {
+func (item *Org) On(event interface{}) bool {
 	switch v := event.(type) {
 	case *OrgCreated:
 		item.Version = v.Model.Version

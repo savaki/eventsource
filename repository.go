@@ -15,7 +15,7 @@ const (
 )
 
 type Aggregate interface {
-	Apply(event interface{}) bool
+	On(event interface{}) bool
 }
 
 type Repository struct {
@@ -111,7 +111,7 @@ func (r *Repository) Load(ctx context.Context, aggregateID string) (interface{},
 	aggregate := v.(Aggregate) // v is guaranteed to be an Aggregate
 
 	for _, event := range history.Events {
-		ok := aggregate.Apply(event)
+		ok := aggregate.On(event)
 		if !ok {
 			meta, err := Inspect(event)
 			if err == nil {

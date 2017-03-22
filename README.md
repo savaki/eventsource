@@ -46,7 +46,7 @@ type User struct {
 	Email   string
 }
 
-func (item *User) Apply(event interface{}) bool {
+func (item *User) On(event interface{}) bool {
 	switch v := event.(type) {
 	case *UserCreated:
 		item.Version = v.Model.Version
