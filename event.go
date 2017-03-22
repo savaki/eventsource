@@ -100,7 +100,7 @@ func (gadget *inspector) inspect(event interface{}) error {
 		tag := field.Tag.Get(tagName)
 
 		if tag == "" {
-			if field.Type.Kind() == reflect.Struct && strings.Contains(field.Type.PkgPath(), ".") {
+			if field.Type.Kind() == reflect.Struct {
 				err := gadget.inspect(fieldValue.Interface())
 				if err != nil {
 					return err
