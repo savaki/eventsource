@@ -11,16 +11,15 @@ import (
 const (
 	mysqlCreateTable = `
 	CREATE TABLE IF NOT EXISTS {{ .TableName }} (
-	    offset     BIGINT(20) PRIMARY KEY NOT NULL AUTO_INCREMENT,
-	    event_key  VARCHAR(255),
-	    event_type VARCHAR(255),
-	    data       VARBINARY(8192),
-	    version    INT,
-	    at         BIGINT(20)
+	    offset    BIGINT(20) PRIMARY KEY NOT NULL AUTO_INCREMENT,
+	    id        VARCHAR(255),
+	    version   INT,
+	    data      VARBINARY(8192),
+	    at        BIGINT(20)
 	) CHARACTER SET utf8 COLLATE utf8_unicode_ci AUTO_INCREMENT=10000;
 `
 
-	mysqlUniqueIndex = `CREATE UNIQUE INDEX idx_{{ .TableName }}_key ON {{ .TableName }} (event_key, event_type)`
+	mysqlUniqueIndex = `CREATE UNIQUE INDEX idx_{{ .TableName }} ON {{ .TableName }} (id, version)`
 )
 
 var (

@@ -26,8 +26,7 @@ const (
 )
 
 const (
-	eventTypePrefix = "_t"
-	dataPrefix      = "_d"
+	prefix = "_"
 )
 
 var (
@@ -35,7 +34,7 @@ var (
 )
 
 func IsKey(key string) bool {
-	return strings.HasPrefix(key, dataPrefix)
+	return strings.HasPrefix(key, prefix)
 }
 
 func VersionFromKey(key string) (int, error) {
@@ -43,7 +42,7 @@ func VersionFromKey(key string) (int, error) {
 		return 0, errInvalidKey
 	}
 
-	return strconv.Atoi(key[len(dataPrefix):])
+	return strconv.Atoi(key[len(prefix):])
 }
 
 // Store represents a dynamodb backed eventsource.Store
@@ -122,21 +121,17 @@ func (s *Store) Fetch(ctx context.Context, serializer eventsource.Serializer, ag
 		// events are stored within av as _t{version} = {event-type}, _d{version} = {serialized event}
 		for _, item := range out.Items {
 			for key, av := range item {
-				if !strings.HasPrefix(key, eventTypePrefix) {
+				if !IsKey(key) {
 					continue
 				}
 
 				if version > 0 {
-					if v, err := strconv.Atoi(key[len(eventTypePrefix):]); err != nil || v > version {
+					if v, err := strconv.Atoi(key[len(prefix):]); err != nil || v > version {
 						continue
 					}
 				}
 
-				eventType := *av.S
-
-				dataKey := dataPrefix + key[len(eventTypePrefix):]
-				data := item[dataKey].B
-				event, err := serializer.Deserialize(eventType, data)
+				event, err := serializer.Deserialize(av.B)
 				if err != nil {
 					return eventsource.History{}, err
 				}
@@ -257,36 +252,23 @@ func makeUpdateItemInput(tableName, hashKey, rangeKey string, eventsPerItem int,
 			// Each event is store as two entries, an event entries and an event type entry.
 
 			// Store the event itself
-			{
-				data, err := serializer.Serialize(meta.Event)
-				if err != nil {
-					return nil, err
-				}
-
-				key := dataPrefix + version
-				nameRef := "#" + dataPrefix + version
-				valueRef := ":" + dataPrefix + version
-
-				if index > 0 {
-					io.WriteString(condExpr, " AND ")
-					io.WriteString(updateExpr, ", ")
-				}
-				fmt.Fprintf(condExpr, "attribute_not_exists(%v)", nameRef)
-				fmt.Fprintf(updateExpr, "%v = %v", nameRef, valueRef)
-				input.ExpressionAttributeNames[nameRef] = aws.String(key)
-				input.ExpressionAttributeValues[valueRef] = &dynamodb.AttributeValue{B: data}
+			data, err := serializer.Serialize(meta.Event)
+			if err != nil {
+				return nil, err
 			}
 
-			// Store the event type
-			{
+			key := prefix + version
+			nameRef := "#" + prefix + version
+			valueRef := ":" + prefix + version
 
-				key := eventTypePrefix + version
-				nameRef := "#" + eventTypePrefix + version
-				valueRef := ":" + eventTypePrefix + version
-				fmt.Fprintf(updateExpr, ", %v = %v", nameRef, valueRef)
-				input.ExpressionAttributeNames[nameRef] = aws.String(key)
-				input.ExpressionAttributeValues[valueRef] = &dynamodb.AttributeValue{S: aws.String(meta.EventType)}
+			if index > 0 {
+				io.WriteString(condExpr, " AND ")
+				io.WriteString(updateExpr, ", ")
 			}
+			fmt.Fprintf(condExpr, "attribute_not_exists(%v)", nameRef)
+			fmt.Fprintf(updateExpr, "%v = %v", nameRef, valueRef)
+			input.ExpressionAttributeNames[nameRef] = aws.String(key)
+			input.ExpressionAttributeValues[valueRef] = &dynamodb.AttributeValue{B: data}
 		}
 
 		input.ConditionExpression = aws.String(condExpr.String())

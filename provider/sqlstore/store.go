@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	sqlInsert        = `INSERT INTO {{ .TableName }} (event_key, event_type, data, version, at) VALUES (?, ?, ?, ?, ?)`
-	sqlSelectVersion = `SELECT event_type, data, version, at FROM {{ .TableName }} WHERE event_key = ? and version <= ?`
-	sqlSelect        = `SELECT event_type, data, version, at FROM {{ .TableName }} WHERE event_key = ?`
+	sqlInsert        = `INSERT INTO {{ .TableName }} (id, version, data, at) VALUES (?, ?, ?, ?)`
+	sqlSelectVersion = `SELECT version, data, at FROM {{ .TableName }} WHERE id = ? and version <= ?`
+	sqlSelect        = `SELECT version, data, at FROM {{ .TableName }} WHERE id = ?`
 )
 
 type OpenFunc func() (*sql.DB, error)
@@ -64,7 +64,7 @@ func (s *Store) Save(ctx context.Context, serializer eventsource.Serializer, eve
 			}
 
 			s.log("Saving version,", meta.Version)
-			_, err = stmt.Exec(meta.ID, meta.EventType, data, meta.Version, meta.At)
+			_, err = stmt.Exec(meta.ID, meta.Version, data, meta.At)
 			if err != nil {
 				return err
 			}
@@ -109,13 +109,13 @@ func (s *Store) Fetch(ctx context.Context, serializer eventsource.Serializer, ag
 		s.log("Scanning row")
 		meta := eventsource.EventMeta{}
 		data := []byte{}
-		err := rows.Scan(&meta.EventType, &data, &meta.Version, &meta.At)
+		err := rows.Scan(&meta.Version, &data, &meta.At)
 		if err != nil {
 			return eventsource.History{}, err
 		}
 
 		s.log("Reading version,", meta.Version)
-		event, err := serializer.Deserialize(meta.EventType, data)
+		event, err := serializer.Deserialize(data)
 		if err != nil {
 			return eventsource.History{}, err
 		}

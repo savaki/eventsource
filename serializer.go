@@ -2,14 +2,18 @@ package eventsource
 
 import (
 	"encoding/json"
-	"errors"
 	"reflect"
 )
 
 type Serializer interface {
 	Bind(...interface{}) error
 	Serialize(interface{}) ([]byte, error)
-	Deserialize(string, []byte) (interface{}, error)
+	Deserialize([]byte) (interface{}, error)
+}
+
+type jsonEvent struct {
+	Type string          `json:"t"`
+	Data json.RawMessage `json:"d"`
 }
 
 type jsonSerializer struct {
@@ -35,19 +39,43 @@ func (j *jsonSerializer) Bind(events ...interface{}) error {
 }
 
 func (j *jsonSerializer) Serialize(v interface{}) ([]byte, error) {
-	return json.Marshal(v)
+	meta, err := Inspect(v)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err = json.Marshal(jsonEvent{
+		Type: meta.EventType,
+		Data: json.RawMessage(data),
+	})
+	if err != nil {
+		return nil, NewError(err, InvalidEncoding, "unable to encode event")
+	}
+
+	return data, nil
 }
 
-func (j *jsonSerializer) Deserialize(eventType string, data []byte) (interface{}, error) {
-	t, ok := j.eventTypes[eventType]
+func (j *jsonSerializer) Deserialize(data []byte) (interface{}, error) {
+	event := jsonEvent{}
+	err := json.Unmarshal(data, &event)
+	if err != nil {
+		return nil, NewError(err, InvalidEncoding, "unable to unmarshal event")
+	}
+
+	t, ok := j.eventTypes[event.Type]
 	if !ok {
-		return nil, errors.New("unable to deserialize")
+		return nil, NewError(err, UnboundEventType, "unbound event type, %v", event.Type)
 	}
 
 	v := reflect.New(t).Interface()
-	err := json.Unmarshal(data, v)
+	err = json.Unmarshal(event.Data, v)
 	if err != nil {
-		return nil, err
+		return nil, NewError(err, InvalidEncoding, "unable to unmarshal event data into %#v", v)
 	}
 
 	return v, nil

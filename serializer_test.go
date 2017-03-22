@@ -27,7 +27,7 @@ func TestJSONSerializer(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, data)
 
-	v, err := serializer.Deserialize("EntitySetName", data)
+	v, err := serializer.Deserialize(data)
 	assert.Nil(t, err)
 
 	found, ok := v.(*EntitySetName)

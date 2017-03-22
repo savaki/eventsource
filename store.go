@@ -49,7 +49,7 @@ func (m *memoryStore) Save(ctx context.Context, serializer Serializer, events ..
 func (m *memoryStore) Fetch(ctx context.Context, serializer Serializer, aggregateID string, version int) (History, error) {
 	v, ok := m.aggregates[aggregateID]
 	if !ok {
-		return History{}, ErrNotFound
+		return History{}, NewError(nil, AggregateNotFound, "no aggregate found with id, %v", aggregateID)
 	}
 
 	highestVersion := 0

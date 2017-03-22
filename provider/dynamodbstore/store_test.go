@@ -50,11 +50,11 @@ func TestIsKey(t *testing.T) {
 		Expected bool
 	}{
 		"simple": {
-			Key:      "_d1",
+			Key:      "_1",
 			Expected: true,
 		},
 		"failed": {
-			Key:      "d1",
+			Key:      "1",
 			Expected: false,
 		},
 	}
@@ -73,19 +73,19 @@ func TestVersionFromKey(t *testing.T) {
 		HasErr  bool
 	}{
 		"simple": {
-			Key:     "_d1",
+			Key:     "_1",
 			Version: 1,
 		},
 		"larger": {
-			Key:     "_d1234",
+			Key:     "_1234",
 			Version: 1234,
 		},
 		"empty": {
-			Key:    "_d",
+			Key:    "_",
 			HasErr: true,
 		},
 		"bad": {
-			Key:    "_dabc",
+			Key:    "_abc",
 			HasErr: true,
 		},
 	}

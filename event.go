@@ -1,7 +1,6 @@
 package eventsource
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -12,17 +11,6 @@ import (
 const (
 	tagName    = "eventsource"
 	typePrefix = "type:"
-)
-
-var (
-	errInspectNil       = errors.New("cannot inspect nil")
-	errDuplicateID      = errors.New("duplicate id tag")
-	errDuplicateVersion = errors.New("duplicate version tag")
-	errDuplicateAt      = errors.New("duplicate at tag")
-	errDuplicateType    = errors.New("duplicate type tag")
-	errInvalidID        = errors.New("eventsource id field must be either string or fmt.Stringer")
-	errInvalidAt        = errors.New("eventsource at field must be of type EpochMillis, int64, or time.Time")
-	errInvalidVersion   = errors.New("eventsource version field must be of type int")
 )
 
 type EpochMillis int64
@@ -78,7 +66,7 @@ type inspector struct {
 
 func (gadget *inspector) inspect(event interface{}) error {
 	if event == nil {
-		return errInspectNil
+		return NewError(nil, AggregateNil, "Illegal attempt to inspect nil aggregate")
 	}
 
 	t := reflect.TypeOf(event)
@@ -115,7 +103,7 @@ func (gadget *inspector) inspect(event interface{}) error {
 			if v := tag[v+1:]; strings.HasPrefix(v, typePrefix) {
 				gadget.EventType = v[len(typePrefix):]
 				if gadget.HasEventType {
-					return errDuplicateType
+					return NewError(nil, DuplicateType, "duplicate type tag found")
 				}
 				gadget.HasEventType = true
 			}
@@ -125,7 +113,7 @@ func (gadget *inspector) inspect(event interface{}) error {
 		switch tag {
 		case "id":
 			if gadget.HasID {
-				return errDuplicateID
+				return NewError(nil, DuplicateID, "duplicate id tag found")
 			}
 
 			switch fieldValue := value.Field(i).Interface().(type) {
@@ -136,25 +124,25 @@ func (gadget *inspector) inspect(event interface{}) error {
 				gadget.ID = fieldValue.String()
 
 			default:
-				return errInvalidID
+				return NewError(nil, InvalidID, "invalid type for id field; want string or fmt.String, got %#v", fieldValue)
 			}
 			gadget.HasID = true
 
 		case "version":
 			if gadget.HasVersion {
-				return errDuplicateVersion
+				return NewError(nil, DuplicateVersion, "duplicate version tag found")
 			}
 			switch fieldValue := value.Field(i).Interface().(type) {
 			case int:
 				gadget.Version = fieldValue
 			default:
-				return errInvalidVersion
+				return NewError(nil, InvalidVersion, "invalid type for version tag; want int, got %#v", fieldValue)
 			}
 			gadget.HasVersion = true
 
 		case "at":
 			if gadget.HasAt {
-				return errDuplicateAt
+				return NewError(nil, DuplicateAt, "duplicate at tag found")
 			}
 			switch fieldValue := value.Field(i).Interface().(type) {
 			case EpochMillis:
@@ -164,7 +152,7 @@ func (gadget *inspector) inspect(event interface{}) error {
 			case time.Time:
 				gadget.At = Time(fieldValue)
 			default:
-				return errInvalidAt
+				return NewError(nil, InvalidAt, "invalid at type for at tag; want be EpocMillis, int64, or time.Time, got %#v", fieldValue)
 			}
 			gadget.HasAt = true
 		}
