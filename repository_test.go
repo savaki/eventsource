@@ -47,6 +47,13 @@ func (item *Org) On(event interface{}) bool {
 	return true
 }
 
+func TestNew(t *testing.T) {
+	repository := eventsource.New(&Org{})
+	aggregate := repository.New()
+	assert.NotNil(t, aggregate)
+	assert.Equal(t, &Org{}, aggregate)
+}
+
 func TestRegistry(t *testing.T) {
 	ctx := context.Background()
 	id := "123"

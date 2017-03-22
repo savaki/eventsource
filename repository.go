@@ -91,6 +91,11 @@ func (r *Repository) Bind(events ...interface{}) error {
 	return nil
 }
 
+// New returns a new instance of the aggregate
+func (r *Repository) New() interface{} {
+	return reflect.New(r.prototype).Interface()
+}
+
 func (r *Repository) Save(ctx context.Context, events ...interface{}) error {
 	return r.store.Save(ctx, r.serializer, events...)
 }
@@ -106,7 +111,7 @@ func (r *Repository) Load(ctx context.Context, aggregateID string) (interface{},
 	}
 
 	r.logf("Loaded %v event(s) for aggregate id, %v", len(history.Events), aggregateID)
-	v := reflect.New(r.prototype).Interface()
+	v := r.New()
 
 	aggregate := v.(Aggregate) // v is guaranteed to be an Aggregate
 
