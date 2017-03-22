@@ -73,6 +73,22 @@ func TestInspect(t *testing.T) {
 		assert.Equal(t, item.Version, meta.Version)
 		assert.Equal(t, item.At, meta.At)
 	})
+
+	t.Run("custom pointer", func(t *testing.T) {
+		item := &EmbeddedCustom{
+			CustomModel: CustomModel{
+				ID:      "123",
+				Version: 4,
+				At:      567,
+			},
+		}
+		meta, err := Inspect(item)
+		assert.Nil(t, err)
+		assert.Equal(t, item.ID, meta.ID)
+		assert.Equal(t, "EmbeddedCustom", meta.EventType)
+		assert.Equal(t, item.Version, meta.Version)
+		assert.Equal(t, item.At, meta.At)
+	})
 }
 
 var (
