@@ -138,7 +138,7 @@ func (s *Store) Fetch(ctx context.Context, serializer eventsource.Serializer, ag
 	s.log("Successfully read", len(events), "events")
 	return eventsource.History{
 		Version: highestVersion,
-		Events:  events,
+		Records: events,
 	}, nil
 }
 

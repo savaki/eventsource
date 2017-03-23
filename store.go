@@ -2,69 +2,51 @@ package eventsource
 
 import (
 	"context"
+	"sort"
 	"sync"
 )
 
-type History struct {
+type History []Record
+
+type Record struct {
 	Version int
-	Events  []interface{}
+	Data    []byte
 }
 
 type Store interface {
-	Save(ctx context.Context, serializer Serializer, events ...interface{}) error
-	Fetch(ctx context.Context, serializer Serializer, aggregateID string, version int) (History, error)
+	Save(ctx context.Context, aggregateID string, records ...Record) error
+	Fetch(ctx context.Context, aggregateID string, version int) (History, error)
 }
 
 type memoryStore struct {
 	mux        *sync.Mutex
-	aggregates map[string][]EventMeta
+	eventsByID map[string]History
 }
 
 func newMemoryStore() *memoryStore {
 	return &memoryStore{
 		mux:        &sync.Mutex{},
-		aggregates: map[string][]EventMeta{},
+		eventsByID: map[string]History{},
 	}
 }
 
-func (m *memoryStore) Save(ctx context.Context, serializer Serializer, events ...interface{}) error {
-	for _, event := range events {
-		meta, err := Inspect(event)
-		if err != nil {
-			return err
-		}
-
-		v, ok := m.aggregates[meta.ID]
-		if !ok {
-			v = make([]EventMeta, 0, len(events))
-			m.aggregates[meta.ID] = v
-		}
-
-		m.aggregates[meta.ID] = append(v, meta)
+func (m *memoryStore) Save(ctx context.Context, aggregateID string, records ...Record) error {
+	if _, ok := m.eventsByID[aggregateID]; !ok {
+		m.eventsByID[aggregateID] = History{}
 	}
+
+	history := append(m.eventsByID[aggregateID], records...)
+	sort.Slice(history, func(i, j int) bool { return history[i].Version < history[j].Version })
+	m.eventsByID[aggregateID] = history
 
 	return nil
 }
 
-func (m *memoryStore) Fetch(ctx context.Context, serializer Serializer, aggregateID string, version int) (History, error) {
-	v, ok := m.aggregates[aggregateID]
+func (m *memoryStore) Fetch(ctx context.Context, aggregateID string, version int) (History, error) {
+	history, ok := m.eventsByID[aggregateID]
 	if !ok {
-		return History{}, NewError(nil, AggregateNotFound, "no aggregate found with id, %v", aggregateID)
+		return nil, NewError(nil, AggregateNotFound, "no aggregate found with id, %v", aggregateID)
 	}
 
-	highestVersion := 0
-
-	events := make([]interface{}, 0, len(v))
-	for _, meta := range v {
-		if version > 0 && meta.Version > version {
-			break
-		}
-		events = append(events, meta.Event)
-		highestVersion = meta.Version
-	}
-
-	return History{
-		Version: highestVersion,
-		Events:  events,
-	}, nil
+	return history, nil
 }

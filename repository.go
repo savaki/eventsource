@@ -92,30 +92,55 @@ func (r *Repository) Bind(events ...interface{}) error {
 }
 
 // New returns a new instance of the aggregate
-func (r *Repository) New() interface{} {
-	return reflect.New(r.prototype).Interface()
+func (r *Repository) New() Aggregate {
+	return reflect.New(r.prototype).Interface().(Aggregate)
 }
 
 func (r *Repository) Save(ctx context.Context, events ...interface{}) error {
-	return r.store.Save(ctx, r.serializer, events...)
+	if len(events) == 0 {
+		return nil
+	}
+
+	var aggregateID string
+	history := make(History, 0, len(events))
+	for _, event := range events {
+		meta, err := Inspect(event)
+		if err != nil {
+			return err
+		}
+		aggregateID = meta.ID
+
+		data, err := r.serializer.Serialize(event)
+		if err != nil {
+			return err
+		}
+
+		history = append(history, Record{Version: meta.Version, Data: data})
+	}
+
+	return r.store.Save(ctx, aggregateID, history...)
 }
 
 func (r *Repository) Load(ctx context.Context, aggregateID string) (interface{}, error) {
-	history, err := r.store.Fetch(ctx, r.serializer, aggregateID, 0)
+	history, err := r.store.Fetch(ctx, aggregateID, 0)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(history.Events) == 0 {
+	entryCount := len(history)
+	if entryCount == 0 {
 		return nil, errors.New("not found")
 	}
 
-	r.logf("Loaded %v event(s) for aggregate id, %v", len(history.Events), aggregateID)
-	v := r.New()
+	r.logf("Loaded %v event(s) for aggregate id, %v", entryCount, aggregateID)
+	aggregate := r.New()
 
-	aggregate := v.(Aggregate) // v is guaranteed to be an Aggregate
+	for _, record := range history {
+		event, err := r.serializer.Deserialize(record.Data)
+		if err != nil {
+			return nil, err
+		}
 
-	for _, event := range history.Events {
 		ok := aggregate.On(event)
 		if !ok {
 			meta, err := Inspect(event)

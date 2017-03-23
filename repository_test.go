@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type Org struct {
+type Entity struct {
 	Version   int
 	ID        string
 	Name      string
@@ -17,25 +17,25 @@ type Org struct {
 	UpdatedAt eventsource.EpochMillis
 }
 
-type OrgCreated struct {
+type EntityCreated struct {
 	eventsource.Model
 	ID string
 }
 
-type OrgNameSet struct {
+type EntityNameSet struct {
 	eventsource.Model
 	Name string
 }
 
-func (item *Org) On(event interface{}) bool {
+func (item *Entity) On(event interface{}) bool {
 	switch v := event.(type) {
-	case *OrgCreated:
+	case *EntityCreated:
 		item.Version = v.Model.Version
 		item.ID = v.Model.ID
 		item.CreatedAt = v.Model.At
 		item.UpdatedAt = v.Model.At
 
-	case *OrgNameSet:
+	case *EntityNameSet:
 		item.Version = v.Model.Version
 		item.Name = v.Name
 		item.UpdatedAt = v.Model.At
@@ -48,10 +48,10 @@ func (item *Org) On(event interface{}) bool {
 }
 
 func TestNew(t *testing.T) {
-	repository := eventsource.New(&Org{})
+	repository := eventsource.New(&Entity{})
 	aggregate := repository.New()
 	assert.NotNil(t, aggregate)
-	assert.Equal(t, &Org{}, aggregate)
+	assert.Equal(t, &Entity{}, aggregate)
 }
 
 func TestRegistry(t *testing.T) {
@@ -60,17 +60,17 @@ func TestRegistry(t *testing.T) {
 	name := "Jones"
 
 	t.Run("simple", func(t *testing.T) {
-		registry := eventsource.New(&Org{}, eventsource.WithDebug(os.Stdout))
-		registry.Bind(OrgCreated{})
-		registry.Bind(OrgNameSet{})
+		registry := eventsource.New(&Entity{}, eventsource.WithDebug(os.Stdout))
+		registry.Bind(EntityCreated{})
+		registry.Bind(EntityNameSet{})
 
 		// Test - Add an event to the store and verify we can recreate the object
 
 		err := registry.Save(ctx,
-			&OrgCreated{
+			&EntityCreated{
 				Model: eventsource.Model{ID: id, Version: 0},
 			},
-			&OrgNameSet{
+			&EntityNameSet{
 				Model: eventsource.Model{ID: id, Version: 1},
 				Name:  name,
 			},
@@ -80,7 +80,7 @@ func TestRegistry(t *testing.T) {
 		v, err := registry.Load(ctx, id)
 		assert.Nil(t, err)
 
-		org, ok := v.(*Org)
+		org, ok := v.(*Entity)
 		assert.True(t, ok)
 		assert.Equal(t, id, org.ID)
 		assert.Equal(t, name, org.Name)
@@ -88,7 +88,7 @@ func TestRegistry(t *testing.T) {
 		// Test - Update the org name and verify that the change is reflected in the loaded result
 
 		updated := "Sarah"
-		err = registry.Save(ctx, &OrgNameSet{
+		err = registry.Save(ctx, &EntityNameSet{
 			Model: eventsource.Model{ID: id, Version: 2},
 			Name:  updated,
 		})
@@ -97,22 +97,22 @@ func TestRegistry(t *testing.T) {
 		v, err = registry.Load(ctx, id)
 		assert.Nil(t, err)
 
-		org, ok = v.(*Org)
+		org, ok = v.(*Entity)
 		assert.True(t, ok)
 		assert.Equal(t, id, org.ID)
 		assert.Equal(t, updated, org.Name)
 	})
 
 	t.Run("with pointer prototype", func(t *testing.T) {
-		registry := eventsource.New(&Org{})
-		registry.Bind(OrgCreated{})
-		registry.Bind(OrgNameSet{})
+		registry := eventsource.New(&Entity{})
+		registry.Bind(EntityCreated{})
+		registry.Bind(EntityNameSet{})
 
 		err := registry.Save(ctx,
-			&OrgCreated{
+			&EntityCreated{
 				Model: eventsource.Model{ID: id, Version: 0},
 			},
-			&OrgNameSet{
+			&EntityNameSet{
 				Model: eventsource.Model{ID: id, Version: 1},
 				Name:  name,
 			},
@@ -121,15 +121,15 @@ func TestRegistry(t *testing.T) {
 
 		v, err := registry.Load(ctx, id)
 		assert.Nil(t, err)
-		assert.Equal(t, name, v.(*Org).Name)
+		assert.Equal(t, name, v.(*Entity).Name)
 	})
 
 	t.Run("with pointer bind", func(t *testing.T) {
-		registry := eventsource.New(&Org{})
-		registry.Bind(&OrgNameSet{})
+		registry := eventsource.New(&Entity{})
+		registry.Bind(&EntityNameSet{})
 
 		err := registry.Save(ctx,
-			&OrgNameSet{
+			&EntityNameSet{
 				Model: eventsource.Model{ID: id, Version: 0},
 				Name:  name,
 			},
@@ -138,7 +138,7 @@ func TestRegistry(t *testing.T) {
 
 		v, err := registry.Load(ctx, id)
 		assert.Nil(t, err)
-		assert.Equal(t, name, v.(*Org).Name)
+		assert.Equal(t, name, v.(*Entity).Name)
 	})
 }
 
@@ -146,10 +146,10 @@ func TestAt(t *testing.T) {
 	ctx := context.Background()
 	id := "123"
 
-	registry := eventsource.New(&Org{}, eventsource.WithDebug(os.Stdout))
-	registry.Bind(OrgCreated{})
+	registry := eventsource.New(&Entity{}, eventsource.WithDebug(os.Stdout))
+	registry.Bind(EntityCreated{})
 	err := registry.Save(ctx,
-		&OrgCreated{
+		&EntityCreated{
 			Model: eventsource.Model{ID: id, Version: 1, At: eventsource.Now()},
 		},
 	)
@@ -158,7 +158,7 @@ func TestAt(t *testing.T) {
 	v, err := registry.Load(ctx, id)
 	assert.Nil(t, err)
 
-	org := v.(*Org)
+	org := v.(*Entity)
 	assert.NotZero(t, org.CreatedAt)
 	assert.NotZero(t, org.UpdatedAt)
 }

@@ -61,6 +61,6 @@ func TestStore_Save(t *testing.T) {
 
 	history, err := store.Fetch(context.Background(), serializer, aggregateID, 0)
 	assert.Nil(t, err)
-	assert.Equal(t, []interface{}{&first, &second}, history.Events)
+	assert.Equal(t, []interface{}{&first, &second}, history.Records)
 	assert.Equal(t, second.Model.Version, history.Version)
 }

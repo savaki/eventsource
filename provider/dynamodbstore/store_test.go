@@ -198,7 +198,7 @@ func TestSave(t *testing.T) {
 
 			history, err := store.Fetch(ctx, serializer, aggregateID, 0)
 			assert.Nil(t, err)
-			assert.Equal(t, []interface{}{&first, &second}, history.Events)
+			assert.Equal(t, []interface{}{&first, &second}, history.Records)
 			assert.Equal(t, second.Model.Version, history.Version)
 
 			partitions, err := fetchPartitions(api, tableName, aggregateID)
@@ -243,6 +243,6 @@ func TestStore_Fetch(t *testing.T) {
 	history, err := store.Fetch(ctx, serializer, aggregateID, 1)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, history.Version)
-	assert.Equal(t, 1, len(history.Events))
-	assert.Equal(t, &first, history.Events[0])
+	assert.Equal(t, 1, len(history.Records))
+	assert.Equal(t, &first, history.Records[0])
 }
