@@ -110,12 +110,12 @@ func (r *Repository) Save(ctx context.Context, events ...interface{}) error {
 		}
 		aggregateID = meta.ID
 
-		data, err := r.serializer.Serialize(event)
+		record, err := r.serializer.Serialize(event)
 		if err != nil {
 			return err
 		}
 
-		history = append(history, Record{Version: meta.Version, Data: data})
+		history = append(history, record)
 	}
 
 	return r.store.Save(ctx, aggregateID, history...)
@@ -136,7 +136,7 @@ func (r *Repository) Load(ctx context.Context, aggregateID string) (interface{},
 	aggregate := r.New()
 
 	for _, record := range history {
-		event, err := r.serializer.Deserialize(record.Data)
+		event, err := r.serializer.Deserialize(record)
 		if err != nil {
 			return nil, err
 		}

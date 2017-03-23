@@ -10,6 +10,7 @@ type History []Record
 
 type Record struct {
 	Version int
+	At      EpochMillis
 	Data    []byte
 }
 

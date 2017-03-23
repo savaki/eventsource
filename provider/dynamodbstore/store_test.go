@@ -168,14 +168,14 @@ func TestSave(t *testing.T) {
 	for label, tc := range testCases {
 		t.Run(label, func(t *testing.T) {
 			aggregateID := strconv.FormatInt(time.Now().UnixNano(), 10)
-			first := EntitySetFirst{
+			e1 := EntitySetFirst{
 				Model: eventsource.Model{
 					ID:      aggregateID,
 					Version: 1,
 				},
 				First: "first",
 			}
-			second := EntitySetLast{
+			e2 := EntitySetLast{
 				Model: eventsource.Model{
 					ID:      aggregateID,
 					Version: 2,
@@ -184,7 +184,13 @@ func TestSave(t *testing.T) {
 			}
 
 			serializer := eventsource.JSONSerializer()
-			serializer.Bind(first, second)
+			serializer.Bind(e1, e2)
+
+			r1, err := serializer.Serialize(e1)
+			assert.Nil(t, err)
+
+			r2, err := serializer.Serialize(e2)
+			assert.Nil(t, err)
 
 			ctx := context.Background()
 			store, err := dynamodbstore.New(tableName,
@@ -193,13 +199,12 @@ func TestSave(t *testing.T) {
 			)
 			assert.Nil(t, err)
 
-			err = store.Save(ctx, serializer, first, second)
+			err = store.Save(ctx, aggregateID, r1, r2)
 			assert.Nil(t, err)
 
-			history, err := store.Fetch(ctx, serializer, aggregateID, 0)
+			history, err := store.Fetch(ctx, aggregateID, 0)
 			assert.Nil(t, err)
-			assert.Equal(t, []interface{}{&first, &second}, history.Records)
-			assert.Equal(t, second.Model.Version, history.Version)
+			assert.Equal(t, eventsource.History{r1, r2}, history)
 
 			partitions, err := fetchPartitions(api, tableName, aggregateID)
 			assert.Nil(t, err)
@@ -212,14 +217,14 @@ func TestStore_Fetch(t *testing.T) {
 	tableName := "sample_events"
 
 	aggregateID := strconv.FormatInt(time.Now().UnixNano(), 10)
-	first := EntitySetFirst{
+	e1 := EntitySetFirst{
 		Model: eventsource.Model{
 			ID:      aggregateID,
 			Version: 1,
 		},
 		First: "first",
 	}
-	second := EntitySetLast{
+	e2 := EntitySetLast{
 		Model: eventsource.Model{
 			ID:      aggregateID,
 			Version: 2,
@@ -228,7 +233,13 @@ func TestStore_Fetch(t *testing.T) {
 	}
 
 	serializer := eventsource.JSONSerializer()
-	serializer.Bind(first, second)
+	serializer.Bind(e1, e2)
+
+	r1, err := serializer.Serialize(e1)
+	assert.Nil(t, err)
+
+	r2, err := serializer.Serialize(e2)
+	assert.Nil(t, err)
 
 	store, err := dynamodbstore.New(tableName,
 		dynamodbstore.WithDynamoDB(api),
@@ -237,12 +248,12 @@ func TestStore_Fetch(t *testing.T) {
 	assert.Nil(t, err)
 
 	ctx := context.Background()
-	err = store.Save(ctx, serializer, first, second)
+	err = store.Save(ctx, aggregateID, r1, r2)
 	assert.Nil(t, err)
 
-	history, err := store.Fetch(ctx, serializer, aggregateID, 1)
+	history, err := store.Fetch(ctx, aggregateID, 1)
 	assert.Nil(t, err)
-	assert.Equal(t, 1, history.Version)
-	assert.Equal(t, 1, len(history.Records))
-	assert.Equal(t, &first, history.Records[0])
+	assert.Equal(t, 1, len(history))
+	assert.Equal(t, 1, history[0].Version)
+	assert.Equal(t, r1, history[0])
 }

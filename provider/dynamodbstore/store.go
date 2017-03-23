@@ -26,11 +26,15 @@ const (
 )
 
 const (
+	// prefix prefixes the event keys in the dynamodb item
 	prefix = "_"
+
+	// atBase refers to the base encoding for the record at
+	atBase = 36
 )
 
 var (
-	errInvalidKey = errors.New("invalid data key")
+	errInvalidKey = errors.New("invalid event key")
 )
 
 func IsKey(key string) bool {
@@ -59,8 +63,8 @@ type Store struct {
 }
 
 // Save implements the eventsource.Store interface
-func (s *Store) Save(ctx context.Context, serializer eventsource.Serializer, events ...interface{}) error {
-	inputs, err := makeUpdateItemInput(s.tableName, s.hashKey, s.rangeKey, s.eventsPerItem, serializer, events...)
+func (s *Store) Save(ctx context.Context, aggregateID string, records ...eventsource.Record) error {
+	inputs, err := makeUpdateItemInput(s.tableName, s.hashKey, s.rangeKey, s.eventsPerItem, aggregateID, records...)
 	if err != nil {
 		return err
 	}
@@ -98,14 +102,14 @@ func (s *Store) logf(format string, args ...interface{}) {
 	}
 }
 
-func (s *Store) Fetch(ctx context.Context, serializer eventsource.Serializer, aggregateID string, version int) (eventsource.History, error) {
+func (s *Store) Fetch(ctx context.Context, aggregateID string, version int) (eventsource.History, error) {
 	partition := selectPartition(version, s.eventsPerItem)
 	input, err := makeQueryInput(s.tableName, s.hashKey, s.rangeKey, aggregateID, partition)
 	if err != nil {
 		return eventsource.History{}, err
 	}
 
-	metas := make([]eventsource.EventMeta, 0, version)
+	history := make(eventsource.History, 0, version)
 
 	var startKey map[string]*dynamodb.AttributeValue
 	for {
@@ -125,23 +129,20 @@ func (s *Store) Fetch(ctx context.Context, serializer eventsource.Serializer, ag
 					continue
 				}
 
-				if version > 0 {
-					if v, err := strconv.Atoi(key[len(prefix):]); err != nil || v > version {
-						continue
-					}
-				}
-
-				event, err := serializer.Deserialize(av.B)
+				recordVersion, recordAt, err := versionAndAt(key)
 				if err != nil {
-					return eventsource.History{}, err
+					return nil, err
 				}
 
-				meta, err := eventsource.Inspect(event)
-				if err != nil {
-					return eventsource.History{}, err
+				if version > 0 && recordVersion > version {
+					continue
 				}
 
-				metas = append(metas, meta)
+				history = append(history, eventsource.Record{
+					Version: recordVersion,
+					At:      recordAt,
+					Data:    av.B,
+				})
 			}
 		}
 
@@ -151,21 +152,11 @@ func (s *Store) Fetch(ctx context.Context, serializer eventsource.Serializer, ag
 		}
 	}
 
-	sort.Slice(metas, func(i, j int) bool {
-		return metas[i].Version < metas[j].Version
+	sort.Slice(history, func(i, j int) bool {
+		return history[i].Version < history[j].Version
 	})
 
-	highestVersion := 0
-	events := make([]interface{}, 0, version)
-	for _, meta := range metas {
-		events = append(events, meta.Event)
-		highestVersion = meta.Version
-	}
-
-	return eventsource.History{
-		Version: highestVersion,
-		Records: events,
-	}, nil
+	return history, nil
 }
 
 func New(tableName string, opts ...Option) (*Store, error) {
@@ -196,30 +187,25 @@ func New(tableName string, opts ...Option) (*Store, error) {
 	return store, nil
 }
 
-func partition(eventsPerItem int, events ...interface{}) (map[int][]eventsource.EventMeta, error) {
-	partitions := map[int][]eventsource.EventMeta{}
+func partition(eventsPerItem int, records ...eventsource.Record) (map[int][]eventsource.Record, error) {
+	partitions := map[int][]eventsource.Record{}
 
-	for _, event := range events {
-		meta, err := eventsource.Inspect(event)
-		if err != nil {
-			return nil, err
-		}
-
-		id := selectPartition(meta.Version, eventsPerItem)
+	for _, record := range records {
+		id := selectPartition(record.Version, eventsPerItem)
 		p, ok := partitions[id]
 		if !ok {
-			p = []eventsource.EventMeta{}
+			p = []eventsource.Record{}
 		}
 
-		partitions[id] = append(p, meta)
+		partitions[id] = append(p, record)
 	}
 
 	return partitions, nil
 }
 
-func makeUpdateItemInput(tableName, hashKey, rangeKey string, eventsPerItem int, serializer eventsource.Serializer, events ...interface{}) ([]*dynamodb.UpdateItemInput, error) {
-	eventCount := len(events)
-	partitions, err := partition(eventsPerItem, events...)
+func makeUpdateItemInput(tableName, hashKey, rangeKey string, eventsPerItem int, aggregateID string, records ...eventsource.Record) ([]*dynamodb.UpdateItemInput, error) {
+	eventCount := len(records)
+	partitions, err := partition(eventsPerItem, records...)
 	if err != nil {
 		return nil, err
 	}
@@ -229,7 +215,7 @@ func makeUpdateItemInput(tableName, hashKey, rangeKey string, eventsPerItem int,
 		input := &dynamodb.UpdateItemInput{
 			TableName: aws.String(tableName),
 			Key: map[string]*dynamodb.AttributeValue{
-				hashKey:  {S: aws.String(partition[0].ID)},
+				hashKey:  {S: aws.String(aggregateID)},
 				rangeKey: {N: aws.String(strconv.Itoa(partitionID))},
 			},
 			ExpressionAttributeNames: map[string]*string{
@@ -246,18 +232,13 @@ func makeUpdateItemInput(tableName, hashKey, rangeKey string, eventsPerItem int,
 		updateExpr := &bytes.Buffer{}
 		io.WriteString(updateExpr, "ADD #revision :one SET ")
 
-		for index, meta := range partition {
-			version := strconv.Itoa(meta.Version)
+		for index, record := range partition {
+			version := strconv.Itoa(record.Version)
+			at := strconv.FormatInt(record.At.Int64(), atBase)
 
 			// Each event is store as two entries, an event entries and an event type entry.
 
-			// Store the event itself
-			data, err := serializer.Serialize(meta.Event)
-			if err != nil {
-				return nil, err
-			}
-
-			key := prefix + version
+			key := prefix + version + ":" + at
 			nameRef := "#" + prefix + version
 			valueRef := ":" + prefix + version
 
@@ -268,7 +249,7 @@ func makeUpdateItemInput(tableName, hashKey, rangeKey string, eventsPerItem int,
 			fmt.Fprintf(condExpr, "attribute_not_exists(%v)", nameRef)
 			fmt.Fprintf(updateExpr, "%v = %v", nameRef, valueRef)
 			input.ExpressionAttributeNames[nameRef] = aws.String(key)
-			input.ExpressionAttributeValues[valueRef] = &dynamodb.AttributeValue{B: data}
+			input.ExpressionAttributeValues[valueRef] = &dynamodb.AttributeValue{B: record.Data}
 		}
 
 		input.ConditionExpression = aws.String(condExpr.String())
@@ -309,4 +290,27 @@ func makeQueryInput(tableName, hashKey, rangeKey string, aggregateID string, par
 
 func selectPartition(version, eventsPerItem int) int {
 	return version / eventsPerItem
+}
+
+func versionAndAt(in string) (int, eventsource.EpochMillis, error) {
+	if !strings.HasPrefix(in, prefix) {
+		return 0, 0, errInvalidKey
+	}
+
+	segments := strings.Split(in[1:], ":")
+	if len(segments) != 2 {
+		return 0, 0, errInvalidKey
+	}
+
+	version, err := strconv.Atoi(segments[0])
+	if err != nil {
+		return 0, 0, errInvalidKey
+	}
+
+	millis, err := strconv.ParseInt(segments[1], atBase, 64)
+	if err != nil {
+		return 0, 0, errInvalidKey
+	}
+
+	return version, eventsource.EpochMillis(millis), nil
 }

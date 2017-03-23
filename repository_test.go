@@ -19,7 +19,6 @@ type Entity struct {
 
 type EntityCreated struct {
 	eventsource.Model
-	ID string
 }
 
 type EntityNameSet struct {
@@ -68,22 +67,22 @@ func TestRegistry(t *testing.T) {
 
 		err := registry.Save(ctx,
 			&EntityCreated{
-				Model: eventsource.Model{ID: id, Version: 0},
+				Model: eventsource.Model{ID: id, Version: 0, At: 3},
 			},
 			&EntityNameSet{
-				Model: eventsource.Model{ID: id, Version: 1},
+				Model: eventsource.Model{ID: id, Version: 1, At: 4},
 				Name:  name,
 			},
 		)
 		assert.Nil(t, err)
 
 		v, err := registry.Load(ctx, id)
-		assert.Nil(t, err)
+		assert.Nil(t, err, "expected successful load")
 
 		org, ok := v.(*Entity)
 		assert.True(t, ok)
-		assert.Equal(t, id, org.ID)
-		assert.Equal(t, name, org.Name)
+		assert.Equal(t, id, org.ID, "expected restored id")
+		assert.Equal(t, name, org.Name, "expected restored name")
 
 		// Test - Update the org name and verify that the change is reflected in the loaded result
 
@@ -110,10 +109,10 @@ func TestRegistry(t *testing.T) {
 
 		err := registry.Save(ctx,
 			&EntityCreated{
-				Model: eventsource.Model{ID: id, Version: 0},
+				Model: eventsource.Model{ID: id, Version: 0, At: 3},
 			},
 			&EntityNameSet{
-				Model: eventsource.Model{ID: id, Version: 1},
+				Model: eventsource.Model{ID: id, Version: 1, At: 4},
 				Name:  name,
 			},
 		)

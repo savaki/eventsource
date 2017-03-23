@@ -6,9 +6,9 @@ import (
 )
 
 type Serializer interface {
-	Bind(...interface{}) error
-	Serialize(interface{}) ([]byte, error)
-	Deserialize([]byte) (interface{}, error)
+	Bind(events ...interface{}) error
+	Serialize(event interface{}) (Record, error)
+	Deserialize(record Record) (interface{}, error)
 }
 
 type jsonEvent struct {
@@ -38,15 +38,15 @@ func (j *jsonSerializer) Bind(events ...interface{}) error {
 	return nil
 }
 
-func (j *jsonSerializer) Serialize(v interface{}) ([]byte, error) {
+func (j *jsonSerializer) Serialize(v interface{}) (Record, error) {
 	meta, err := Inspect(v)
 	if err != nil {
-		return nil, err
+		return Record{}, err
 	}
 
 	data, err := json.Marshal(v)
 	if err != nil {
-		return nil, err
+		return Record{}, err
 	}
 
 	data, err = json.Marshal(jsonEvent{
@@ -54,15 +54,19 @@ func (j *jsonSerializer) Serialize(v interface{}) ([]byte, error) {
 		Data: json.RawMessage(data),
 	})
 	if err != nil {
-		return nil, NewError(err, InvalidEncoding, "unable to encode event")
+		return Record{}, NewError(err, InvalidEncoding, "unable to encode event")
 	}
 
-	return data, nil
+	return Record{
+		Version: meta.Version,
+		At:      meta.At,
+		Data:    data,
+	}, nil
 }
 
-func (j *jsonSerializer) Deserialize(data []byte) (interface{}, error) {
+func (j *jsonSerializer) Deserialize(record Record) (interface{}, error) {
 	event := jsonEvent{}
-	err := json.Unmarshal(data, &event)
+	err := json.Unmarshal(record.Data, &event)
 	if err != nil {
 		return nil, NewError(err, InvalidEncoding, "unable to unmarshal event")
 	}

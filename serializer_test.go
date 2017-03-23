@@ -23,11 +23,11 @@ func TestJSONSerializer(t *testing.T) {
 
 	serializer := eventsource.JSONSerializer()
 	serializer.Bind(event)
-	data, err := serializer.Serialize(event)
+	record, err := serializer.Serialize(event)
 	assert.Nil(t, err)
-	assert.NotNil(t, data)
+	assert.NotNil(t, record)
 
-	v, err := serializer.Deserialize(data)
+	v, err := serializer.Deserialize(record)
 	assert.Nil(t, err)
 
 	found, ok := v.(*EntitySetName)

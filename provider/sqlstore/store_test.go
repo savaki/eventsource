@@ -36,14 +36,14 @@ func TestStore_Save(t *testing.T) {
 	// Return
 
 	aggregateID := strconv.FormatInt(time.Now().UnixNano(), 10)
-	first := EntitySetFirst{
+	e1 := EntitySetFirst{
 		Model: eventsource.Model{
 			ID:      aggregateID,
 			Version: 1,
 		},
 		First: "first",
 	}
-	second := EntitySetLast{
+	e2 := EntitySetLast{
 		Model: eventsource.Model{
 			ID:      aggregateID,
 			Version: 2,
@@ -52,15 +52,21 @@ func TestStore_Save(t *testing.T) {
 	}
 
 	serializer := eventsource.JSONSerializer()
-	serializer.Bind(first, second)
+	serializer.Bind(e1, e2)
+
+	r1, err := serializer.Serialize(e1)
+	assert.Nil(t, err)
+
+	r2, err := serializer.Serialize(e2)
+	assert.Nil(t, err)
 
 	store := sqlstore.New(tableName, Open, sqlstore.WithDebug(os.Stderr))
 
-	err = store.Save(context.Background(), serializer, first, second)
+	err = store.Save(context.Background(), e1.Model.ID, r1, r2)
 	assert.Nil(t, err)
 
-	history, err := store.Fetch(context.Background(), serializer, aggregateID, 0)
+	history, err := store.Fetch(context.Background(), aggregateID, 0)
 	assert.Nil(t, err)
-	assert.Equal(t, []interface{}{&first, &second}, history.Records)
-	assert.Equal(t, second.Model.Version, history.Version)
+	assert.Equal(t, eventsource.History{r1, r2}, history)
+	assert.Equal(t, e2.Model.Version, history[1].Version)
 }
