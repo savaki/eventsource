@@ -36,3 +36,10 @@ func TestRawEvents(t *testing.T) {
 	assert.Equal(t, c, events[1])
 	assert.Equal(t, d, events[2])
 }
+
+func TestTableName(t *testing.T) {
+	arn := "arn:aws:dynamodb:us-west-2:528688496454:table/table-local-orgs/stream/2017-03-14T04:49:34.930"
+	tableName, err := dynamodbstore.TableName(arn)
+	assert.Nil(t, err)
+	assert.Equal(t, "table-local-orgs", tableName)
+}
