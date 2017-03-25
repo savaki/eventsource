@@ -70,14 +70,17 @@ func TestVersionFromKey(t *testing.T) {
 	testCases := map[string]struct {
 		Key     string
 		Version int
+		At      eventsource.EpochMillis
 		HasErr  bool
 	}{
 		"simple": {
-			Key:     "_1",
+			Key:     "_1:3",
+			At:      3,
 			Version: 1,
 		},
 		"larger": {
-			Key:     "_1234",
+			Key:     "_1234:4",
+			At:      4,
 			Version: 1234,
 		},
 		"empty": {
@@ -92,8 +95,9 @@ func TestVersionFromKey(t *testing.T) {
 
 	for label, tc := range testCases {
 		t.Run(label, func(t *testing.T) {
-			version, err := dynamodbstore.VersionFromKey(tc.Key)
+			version, at, err := dynamodbstore.VersionAndAt(tc.Key)
 			assert.True(t, tc.HasErr == (err != nil))
+			assert.Equal(t, tc.At, at)
 			assert.Equal(t, tc.Version, version)
 		})
 	}

@@ -41,14 +41,6 @@ func IsKey(key string) bool {
 	return strings.HasPrefix(key, prefix)
 }
 
-func VersionFromKey(key string) (int, error) {
-	if !IsKey(key) {
-		return 0, errInvalidKey
-	}
-
-	return strconv.Atoi(key[len(prefix):])
-}
-
 // Store represents a dynamodb backed eventsource.Store
 type Store struct {
 	region        string
@@ -129,7 +121,7 @@ func (s *Store) Fetch(ctx context.Context, aggregateID string, version int) (eve
 					continue
 				}
 
-				recordVersion, recordAt, err := versionAndAt(key)
+				recordVersion, recordAt, err := VersionAndAt(key)
 				if err != nil {
 					return nil, err
 				}
@@ -292,12 +284,12 @@ func selectPartition(version, eventsPerItem int) int {
 	return version / eventsPerItem
 }
 
-func versionAndAt(in string) (int, eventsource.EpochMillis, error) {
-	if !strings.HasPrefix(in, prefix) {
+func VersionAndAt(key string) (int, eventsource.EpochMillis, error) {
+	if !strings.HasPrefix(key, prefix) {
 		return 0, 0, errInvalidKey
 	}
 
-	segments := strings.Split(in[1:], ":")
+	segments := strings.Split(key[1:], ":")
 	if len(segments) != 2 {
 		return 0, 0, errInvalidKey
 	}

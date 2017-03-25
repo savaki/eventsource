@@ -41,7 +41,7 @@ func RawEvents(record *dynamo.Record) ([][]byte, error) {
 
 	items := make([]event, 0, len(keys))
 	for key := range keys {
-		version, err := VersionFromKey(key)
+		version, _, err := VersionAndAt(key)
 		if err != nil {
 			return nil, err
 		}

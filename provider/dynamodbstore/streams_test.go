@@ -18,13 +18,13 @@ func TestRawEvents(t *testing.T) {
 	record := &dynamo.Record{
 		Dynamodb: &dynamo.StreamRecord{
 			NewImage: map[string]*dynamodb.AttributeValue{
-				"_4": {B: d},
-				"_2": {B: b},
-				"_3": {B: c},
-				"_1": {B: a},
+				"_4:3": {B: d},
+				"_2:1": {B: b},
+				"_3:2": {B: c},
+				"_1:0": {B: a},
 			},
 			OldImage: map[string]*dynamodb.AttributeValue{
-				"_1": {B: a},
+				"_1:0": {B: a},
 			},
 		},
 	}
