@@ -7,8 +7,8 @@ import (
 )
 
 type RepositoryAPI interface {
-	Bind(events ...interface{}) error
-	Load(ctx context.Context, aggregateID string) (interface{}, error)
-	Save(ctx context.Context, events ...interface{}) error
+	Bind(events ...eventsource.Event) error
+	Load(ctx context.Context, aggregateID string) (eventsource.Aggregate, error)
+	Save(ctx context.Context, events ...eventsource.Event) error
 	New() eventsource.Aggregate
 }
