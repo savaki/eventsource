@@ -2,8 +2,10 @@ package eventsource_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/savaki/eventsource"
 	"github.com/stretchr/testify/assert"
@@ -13,8 +15,8 @@ type Entity struct {
 	Version   int
 	ID        string
 	Name      string
-	CreatedAt eventsource.EpochMillis
-	UpdatedAt eventsource.EpochMillis
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 type EntityCreated struct {
@@ -26,7 +28,7 @@ type EntityNameSet struct {
 	Name string
 }
 
-func (item *Entity) On(event interface{}) bool {
+func (item *Entity) On(event eventsource.Event) bool {
 	switch v := event.(type) {
 	case *EntityCreated:
 		item.Version = v.Model.Version
@@ -67,10 +69,10 @@ func TestRegistry(t *testing.T) {
 
 		err := registry.Save(ctx,
 			&EntityCreated{
-				Model: eventsource.Model{ID: id, Version: 0, At: 3},
+				Model: eventsource.Model{ID: id, Version: 0, At: time.Unix(3, 0)},
 			},
 			&EntityNameSet{
-				Model: eventsource.Model{ID: id, Version: 1, At: 4},
+				Model: eventsource.Model{ID: id, Version: 1, At: time.Unix(4, 0)},
 				Name:  name,
 			},
 		)
@@ -78,6 +80,7 @@ func TestRegistry(t *testing.T) {
 
 		v, err := registry.Load(ctx, id)
 		assert.Nil(t, err, "expected successful load")
+		fmt.Printf("%#v\n", v)
 
 		org, ok := v.(*Entity)
 		assert.True(t, ok)
@@ -109,10 +112,10 @@ func TestRegistry(t *testing.T) {
 
 		err := registry.Save(ctx,
 			&EntityCreated{
-				Model: eventsource.Model{ID: id, Version: 0, At: 3},
+				Model: eventsource.Model{ID: id, Version: 0, At: time.Unix(3, 0)},
 			},
 			&EntityNameSet{
-				Model: eventsource.Model{ID: id, Version: 1, At: 4},
+				Model: eventsource.Model{ID: id, Version: 1, At: time.Unix(4, 0)},
 				Name:  name,
 			},
 		)
@@ -149,7 +152,7 @@ func TestAt(t *testing.T) {
 	registry.Bind(EntityCreated{})
 	err := registry.Save(ctx,
 		&EntityCreated{
-			Model: eventsource.Model{ID: id, Version: 1, At: eventsource.Now()},
+			Model: eventsource.Model{ID: id, Version: 1, At: time.Now()},
 		},
 	)
 	assert.Nil(t, err)

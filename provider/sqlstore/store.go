@@ -98,17 +98,18 @@ func (s *Store) Fetch(ctx context.Context, aggregateID string, version int) (eve
 	history := make(eventsource.History, 0, version+1)
 	for rows.Next() {
 		s.log("Scanning row")
-		meta := eventsource.EventMeta{}
+		version := 0
 		data := []byte{}
-		err := rows.Scan(&meta.Version, &data, &meta.At)
+		at := eventsource.EpochMillis(0)
+		err := rows.Scan(&version, &data, &at)
 		if err != nil {
 			return eventsource.History{}, err
 		}
 
-		s.log("Reading version,", meta.Version)
+		s.log("Reading version,", version)
 		history = append(history, eventsource.Record{
-			Version: meta.Version,
-			At:      meta.At,
+			Version: version,
+			At:      at,
 			Data:    data,
 		})
 	}

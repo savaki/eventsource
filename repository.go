@@ -15,7 +15,7 @@ const (
 )
 
 type Aggregate interface {
-	On(event interface{}) bool
+	On(event Event) bool
 }
 
 type Repository struct {
@@ -62,7 +62,20 @@ func (r *Repository) logf(format string, args ...interface{}) {
 	}
 }
 
-func (r *Repository) Bind(events ...interface{}) error {
+func extractEventType(event Event) (string, reflect.Type) {
+	t := reflect.TypeOf(event)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	if v, ok := event.(EventTyper); ok {
+		return v.EventType(), t
+	}
+
+	return t.Name(), t
+}
+
+func (r *Repository) Bind(events ...Event) error {
 	for _, event := range events {
 		if event == nil {
 			return errors.New("attempt to bind nil event")
@@ -73,19 +86,9 @@ func (r *Repository) Bind(events ...interface{}) error {
 			return err
 		}
 
-		meta, err := Inspect(event)
-		if err != nil {
-			return err
-		}
-
-		r.logf("Binding %12s => %#v", meta.EventType, event)
-
-		eventType := reflect.TypeOf(event)
-		if eventType.Kind() == reflect.Ptr {
-			eventType = eventType.Elem()
-		}
-
-		r.types[meta.EventType] = eventType
+		eventType, typ := extractEventType(event)
+		r.logf("Binding %12s => %#v", eventType, event)
+		r.types[eventType] = typ
 	}
 
 	return nil
@@ -96,7 +99,7 @@ func (r *Repository) New() Aggregate {
 	return reflect.New(r.prototype).Interface().(Aggregate)
 }
 
-func (r *Repository) Save(ctx context.Context, events ...interface{}) error {
+func (r *Repository) Save(ctx context.Context, events ...Event) error {
 	if len(events) == 0 {
 		return nil
 	}
@@ -104,16 +107,12 @@ func (r *Repository) Save(ctx context.Context, events ...interface{}) error {
 	var aggregateID string
 	history := make(History, 0, len(events))
 	for _, event := range events {
-		meta, err := Inspect(event)
-		if err != nil {
-			return err
-		}
-		aggregateID = meta.ID
-
 		record, err := r.serializer.Serialize(event)
 		if err != nil {
 			return err
 		}
+
+		aggregateID = event.AggregateID()
 
 		history = append(history, record)
 	}
@@ -121,7 +120,7 @@ func (r *Repository) Save(ctx context.Context, events ...interface{}) error {
 	return r.store.Save(ctx, aggregateID, history...)
 }
 
-func (r *Repository) Load(ctx context.Context, aggregateID string) (interface{}, error) {
+func (r *Repository) Load(ctx context.Context, aggregateID string) (Aggregate, error) {
 	history, err := r.store.Fetch(ctx, aggregateID, 0)
 	if err != nil {
 		return nil, err
@@ -143,15 +142,12 @@ func (r *Repository) Load(ctx context.Context, aggregateID string) (interface{},
 
 		ok := aggregate.On(event)
 		if !ok {
-			meta, err := Inspect(event)
-			if err == nil {
-				return nil, errors.New(msgUnhandledEvent + " - " + meta.EventType)
-			}
-			return nil, errors.New(msgUnhandledEvent)
+			eventType, _ := extractEventType(event)
+			return nil, fmt.Errorf(msgUnhandledEvent + " - " + eventType)
 		}
 	}
 
-	return aggregate, nil
+	return aggregate.(Aggregate), nil
 }
 
 type Option func(registry *Repository)

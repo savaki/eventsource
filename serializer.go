@@ -6,9 +6,9 @@ import (
 )
 
 type Serializer interface {
-	Bind(events ...interface{}) error
-	Serialize(event interface{}) (Record, error)
-	Deserialize(record Record) (interface{}, error)
+	Bind(events ...Event) error
+	Serialize(event Event) (Record, error)
+	Deserialize(record Record) (Event, error)
 }
 
 type jsonEvent struct {
@@ -20,29 +20,17 @@ type jsonSerializer struct {
 	eventTypes map[string]reflect.Type
 }
 
-func (j *jsonSerializer) Bind(events ...interface{}) error {
+func (j *jsonSerializer) Bind(events ...Event) error {
 	for _, event := range events {
-		meta, err := Inspect(event)
-		if err != nil {
-			return err
-		}
-
-		t := reflect.TypeOf(event)
-		if t.Kind() == reflect.Ptr {
-			t = t.Elem()
-		}
-
-		j.eventTypes[meta.EventType] = t
+		eventType, t := extractEventType(event)
+		j.eventTypes[eventType] = t
 	}
 
 	return nil
 }
 
-func (j *jsonSerializer) Serialize(v interface{}) (Record, error) {
-	meta, err := Inspect(v)
-	if err != nil {
-		return Record{}, err
-	}
+func (j *jsonSerializer) Serialize(v Event) (Record, error) {
+	eventType, _ := extractEventType(v)
 
 	data, err := json.Marshal(v)
 	if err != nil {
@@ -50,7 +38,7 @@ func (j *jsonSerializer) Serialize(v interface{}) (Record, error) {
 	}
 
 	data, err = json.Marshal(jsonEvent{
-		Type: meta.EventType,
+		Type: eventType,
 		Data: json.RawMessage(data),
 	})
 	if err != nil {
@@ -58,31 +46,31 @@ func (j *jsonSerializer) Serialize(v interface{}) (Record, error) {
 	}
 
 	return Record{
-		Version: meta.Version,
-		At:      meta.At,
+		Version: v.EventVersion(),
+		At:      Time(v.EventAt()),
 		Data:    data,
 	}, nil
 }
 
-func (j *jsonSerializer) Deserialize(record Record) (interface{}, error) {
-	event := jsonEvent{}
-	err := json.Unmarshal(record.Data, &event)
+func (j *jsonSerializer) Deserialize(record Record) (Event, error) {
+	wrapper := jsonEvent{}
+	err := json.Unmarshal(record.Data, &wrapper)
 	if err != nil {
 		return nil, NewError(err, InvalidEncoding, "unable to unmarshal event")
 	}
 
-	t, ok := j.eventTypes[event.Type]
+	t, ok := j.eventTypes[wrapper.Type]
 	if !ok {
-		return nil, NewError(err, UnboundEventType, "unbound event type, %v", event.Type)
+		return nil, NewError(err, UnboundEventType, "unbound event type, %v", wrapper.Type)
 	}
 
 	v := reflect.New(t).Interface()
-	err = json.Unmarshal(event.Data, v)
+	err = json.Unmarshal(wrapper.Data, v)
 	if err != nil {
 		return nil, NewError(err, InvalidEncoding, "unable to unmarshal event data into %#v", v)
 	}
 
-	return v, nil
+	return v.(Event), nil
 }
 
 func JSONSerializer() Serializer {

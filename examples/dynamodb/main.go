@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/savaki/eventsource"
 	"github.com/savaki/eventsource/provider/dynamodbstore"
@@ -22,9 +23,22 @@ type UserNameSet struct {
 
 // UserLastSet defines an event via tags
 type UserEmailSet struct {
-	ID      string `eventsource:"id,type:user-last-set"`
-	Version int    `eventsource:"version"`
+	ID      string
+	Version int
+	At      time.Time
 	Email   string
+}
+
+func (m UserEmailSet) AggregateID() string {
+	return m.ID
+}
+
+func (m UserEmailSet) EventVersion() int {
+	return m.Version
+}
+
+func (m UserEmailSet) EventAt() time.Time {
+	return m.At
 }
 
 type User struct {
@@ -34,7 +48,7 @@ type User struct {
 	Email   string
 }
 
-func (item *User) On(event interface{}) bool {
+func (item *User) On(event eventsource.Event) bool {
 	switch v := event.(type) {
 	case *UserCreated:
 		item.Version = v.Model.Version
