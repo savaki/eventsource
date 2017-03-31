@@ -53,7 +53,7 @@ func (m UserEmailSet) EventAt() time.Time {
 	return m.At
 }
 
-type User struct {
+type User struct { 
 	ID      string
 	Version int
 	Name    string

@@ -22,7 +22,7 @@ type jsonSerializer struct {
 
 func (j *jsonSerializer) Bind(events ...Event) error {
 	for _, event := range events {
-		eventType, t := extractEventType(event)
+		eventType, t := EventType(event)
 		j.eventTypes[eventType] = t
 	}
 
@@ -30,7 +30,7 @@ func (j *jsonSerializer) Bind(events ...Event) error {
 }
 
 func (j *jsonSerializer) Serialize(v Event) (Record, error) {
-	eventType, _ := extractEventType(v)
+	eventType, _ := EventType(v)
 
 	data, err := json.Marshal(v)
 	if err != nil {

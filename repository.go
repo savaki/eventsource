@@ -62,7 +62,7 @@ func (r *Repository) logf(format string, args ...interface{}) {
 	}
 }
 
-func extractEventType(event Event) (string, reflect.Type) {
+func EventType(event Event) (string, reflect.Type) {
 	t := reflect.TypeOf(event)
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
@@ -86,7 +86,7 @@ func (r *Repository) Bind(events ...Event) error {
 			return err
 		}
 
-		eventType, typ := extractEventType(event)
+		eventType, typ := EventType(event)
 		r.logf("Binding %12s => %#v", eventType, event)
 		r.types[eventType] = typ
 	}
@@ -142,7 +142,7 @@ func (r *Repository) Load(ctx context.Context, aggregateID string) (Aggregate, e
 
 		ok := aggregate.On(event)
 		if !ok {
-			eventType, _ := extractEventType(event)
+			eventType, _ := EventType(event)
 			return nil, fmt.Errorf(msgUnhandledEvent + " - " + eventType)
 		}
 	}
