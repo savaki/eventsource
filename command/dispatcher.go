@@ -23,19 +23,19 @@ type Constructor interface {
 // Preprocessor manipulates commands prior to them being executed by the Handler
 type Preprocessor interface {
 	// Before is executed prior to the Handler.Apply call
-	Before(ctx context.Context, command Interface) error
+	Before(ctx context.Context, cmd Interface) error
 }
 
 // Dispatcher manages the execution of a command
 type Dispatcher interface {
 	// Dispatch retrieves the Aggregate from the Repository, applies the Handler, and saves the result to the Repository
-	Dispatch(ctx context.Context, command Interface) error
+	Dispatch(ctx context.Context, cmd Interface) error
 }
 
-type dispatchFunc func(ctx context.Context, command Interface) error
+type dispatchFunc func(ctx context.Context, cmd Interface) error
 
-func (fn dispatchFunc) Dispatch(ctx context.Context, command Interface) error {
-	return fn(ctx, command)
+func (fn dispatchFunc) Dispatch(ctx context.Context, cmd Interface) error {
+	return fn(ctx, cmd)
 }
 
 // New instantiates a new Dispatcher using the Repository and optional Preprocessors provided
