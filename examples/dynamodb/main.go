@@ -75,8 +75,8 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	userEvents := eventsource.New(&User{}, eventsource.WithStore(store))
-	err = userEvents.Bind(
+	repo := eventsource.New(&User{}, eventsource.WithStore(store))
+	err = repo.Bind(
 		UserCreated{},
 		UserNameSet{},
 		UserEmailSet{},
@@ -97,12 +97,12 @@ func main() {
 	}
 
 	ctx := context.Background()
-	err = userEvents.Save(ctx, setEmailEvent, setNameEvent)
+	err = repo.Save(ctx, setEmailEvent, setNameEvent)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	v, err := userEvents.Load(ctx, id)
+	v, err := repo.Load(ctx, id)
 	if err != nil {
 		log.Fatalln(err)
 	}
