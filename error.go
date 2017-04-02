@@ -14,6 +14,7 @@ const (
 	InvalidEncoding   = "InvalidEncoding"
 	UnboundEventType  = "UnboundEventType"
 	AggregateNotFound = "AggregateNotFound"
+	UnhandledEvent    = "UnhandledEvent"
 )
 
 type Error interface {

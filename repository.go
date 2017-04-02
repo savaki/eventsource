@@ -14,11 +14,22 @@ const (
 	msgUnhandledEvent = "aggregate was unable to handle event"
 )
 
+// Aggregate represents the aggregate root in the domain driven design sense.  It aggregates the events and presents the
+// current view of the domain object
 type Aggregate interface {
+
+	// On will be called for each event processed; returns true if aggregate was able to handle the event, false otherwise
 	On(event Event) bool
 }
 
-type Repository struct {
+type Repository interface {
+	Bind(events ...Event) error
+	Load(ctx context.Context, aggregateID string) (Aggregate, error)
+	Save(ctx context.Context, events ...Event) error
+	New() Aggregate
+}
+
+type repository struct {
 	prototype  reflect.Type
 	store      Store
 	serializer Serializer
@@ -27,13 +38,13 @@ type Repository struct {
 	debug      bool
 }
 
-func New(prototype Aggregate, opts ...Option) *Repository {
+func New(prototype Aggregate, opts ...Option) Repository {
 	t := reflect.TypeOf(prototype)
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
 
-	r := &Repository{
+	r := &repository{
 		prototype:  t,
 		store:      newMemoryStore(),
 		serializer: JSONSerializer(),
@@ -47,7 +58,7 @@ func New(prototype Aggregate, opts ...Option) *Repository {
 	return r
 }
 
-func (r *Repository) logf(format string, args ...interface{}) {
+func (r *repository) logf(format string, args ...interface{}) {
 	if !r.debug {
 		return
 	}
@@ -75,7 +86,7 @@ func EventType(event Event) (string, reflect.Type) {
 	return t.Name(), t
 }
 
-func (r *Repository) Bind(events ...Event) error {
+func (r *repository) Bind(events ...Event) error {
 	for _, event := range events {
 		if event == nil {
 			return errors.New("attempt to bind nil event")
@@ -95,11 +106,11 @@ func (r *Repository) Bind(events ...Event) error {
 }
 
 // New returns a new instance of the aggregate
-func (r *Repository) New() Aggregate {
+func (r *repository) New() Aggregate {
 	return reflect.New(r.prototype).Interface().(Aggregate)
 }
 
-func (r *Repository) Save(ctx context.Context, events ...Event) error {
+func (r *repository) Save(ctx context.Context, events ...Event) error {
 	if len(events) == 0 {
 		return nil
 	}
@@ -120,7 +131,7 @@ func (r *Repository) Save(ctx context.Context, events ...Event) error {
 	return r.store.Save(ctx, aggregateID, history...)
 }
 
-func (r *Repository) Load(ctx context.Context, aggregateID string) (Aggregate, error) {
+func (r *repository) Load(ctx context.Context, aggregateID string) (Aggregate, error) {
 	history, err := r.store.Fetch(ctx, aggregateID, 0)
 	if err != nil {
 		return nil, err
@@ -150,22 +161,22 @@ func (r *Repository) Load(ctx context.Context, aggregateID string) (Aggregate, e
 	return aggregate.(Aggregate), nil
 }
 
-type Option func(registry *Repository)
+type Option func(registry *repository)
 
 func WithStore(store Store) Option {
-	return func(registry *Repository) {
+	return func(registry *repository) {
 		registry.store = store
 	}
 }
 
 func WithSerializer(serializer Serializer) Option {
-	return func(registry *Repository) {
+	return func(registry *repository) {
 		registry.serializer = serializer
 	}
 }
 
 func WithDebug(w io.Writer) Option {
-	return func(registry *Repository) {
+	return func(registry *repository) {
 		registry.debug = true
 		registry.writer = w
 	}
