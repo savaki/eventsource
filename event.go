@@ -17,9 +17,10 @@ type Event interface {
 	EventAt() time.Time
 }
 
-// EventTyper is an optional interface that allows an event to specify a name different than the name of the struct
+// EventTyper is an optional interface that can be applied to an Event that allows it to specify an event type
+// different than the name of the struct
 type EventTyper interface {
-	// EventType returns the type of event
+	// EventType returns the name of event type
 	EventType() string
 }
 
