@@ -17,6 +17,7 @@ const (
 	UnhandledEvent    = "UnhandledEvent"
 )
 
+// Error provides a standardized error interface for eventsource
 type Error interface {
 	error
 
