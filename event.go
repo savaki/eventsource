@@ -23,20 +23,29 @@ type EventTyper interface {
 	EventType() string
 }
 
+// Model provides a default implementation of an Event that is suitable for being embedded
 type Model struct {
-	ID      string
+	// ID contains the AggregateID
+	ID string
+
+	// Version holds the event version
 	Version int
-	At      time.Time
+
+	// At contains the event time
+	At time.Time
 }
 
+// AggregateID implements part of the Event interface
 func (m Model) AggregateID() string {
 	return m.ID
 }
 
+// EventVersion implements part of the Event interface
 func (m Model) EventVersion() int {
 	return m.Version
 }
 
+// EventAt implements part of the Event interface
 func (m Model) EventAt() time.Time {
 	return m.At
 }

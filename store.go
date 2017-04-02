@@ -6,19 +6,31 @@ import (
 	"sync"
 )
 
+// History represents the events to be applied to recreate the aggregate in version order
 type History []Record
 
+// Record provides the shape of the records to be saved to the db
 type Record struct {
+	// Version is the event version the Data represents
 	Version int
-	At      EpochMillis
-	Data    []byte
+
+	// At indicates when the event happened; provided as a utility for the store
+	At EpochMillis
+
+	// Data contains the Serializer encoded version of the data
+	Data []byte
 }
 
+// Store provides storage for events
 type Store interface {
+	// Save saves events to the store
 	Save(ctx context.Context, aggregateID string, records ...Record) error
+
+	// Fetch retrieves the History of events with the specified aggregate id
 	Fetch(ctx context.Context, aggregateID string, version int) (History, error)
 }
 
+// memoryStore provides an in-memory implementation of Store
 type memoryStore struct {
 	mux        *sync.Mutex
 	eventsByID map[string]History
