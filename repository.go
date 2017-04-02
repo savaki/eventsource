@@ -73,7 +73,7 @@ func (r *repository) logf(format string, args ...interface{}) {
 	}
 }
 
-// EventType extracts name of the event type along with the reflect.Type of the event.
+// EventType is a helper func that extracts the event type of the event along with the reflect.Type of the event.
 //
 // Primarily useful for serializers that need to understand how marshal and unmarshal instances of Event to a []byte
 func EventType(event Event) (string, reflect.Type) {
