@@ -5,22 +5,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/savaki/eventsource"
 	"github.com/savaki/eventsource/provider/postgres"
 	"github.com/savaki/eventsource/provider/providertest"
 	"github.com/savaki/eventsource/provider/sqlstore"
 	"github.com/stretchr/testify/assert"
 )
-
-type EntitySetFirst struct {
-	eventsource.Model
-	First string
-}
-
-type EntitySetLast struct {
-	eventsource.Model
-	Last string
-}
 
 func TestStore_Save(t *testing.T) {
 	ctx := context.Background()
