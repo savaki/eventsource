@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"math"
+	"regexp"
 	"sort"
 	"time"
 
@@ -17,6 +18,10 @@ const (
 	sqlInsert        = `INSERT INTO {{ .TableName }} (id, version, data, at) VALUES (?, ?, ?, ?)`
 	sqlSelectVersion = `SELECT version, data, at FROM {{ .TableName }} WHERE id = ? and version <= ?`
 	sqlSelect        = `SELECT version, data, at FROM {{ .TableName }} WHERE id = ?`
+)
+
+var (
+	ReTableName = regexp.MustCompile(`\{\{\s*.TableName\s*}}`)
 )
 
 type OpenFunc func() (*sql.DB, error)
@@ -132,9 +137,9 @@ func (s *Store) log(args ...interface{}) {
 }
 
 func New(tableName string, openFunc OpenFunc, opts ...Option) *Store {
-	insertSQL := reTableName.ReplaceAllString(sqlInsert, tableName)
-	selectSQL := reTableName.ReplaceAllString(sqlSelect, tableName)
-	selectVersionSQL := reTableName.ReplaceAllString(sqlSelectVersion, tableName)
+	insertSQL := ReTableName.ReplaceAllString(sqlInsert, tableName)
+	selectSQL := ReTableName.ReplaceAllString(sqlSelect, tableName)
+	selectVersionSQL := ReTableName.ReplaceAllString(sqlSelectVersion, tableName)
 
 	s := &Store{
 		openFunc:         openFunc,

@@ -1,11 +1,11 @@
-package sqlstore
+package mysql
 
 import (
 	"context"
 	"database/sql"
-	"regexp"
 
 	"github.com/go-sql-driver/mysql"
+	"github.com/savaki/eventsource/provider/sqlstore"
 )
 
 const (
@@ -22,12 +22,8 @@ const (
 	mysqlUniqueIndex = `CREATE UNIQUE INDEX idx_{{ .TableName }} ON {{ .TableName }} (id, version)`
 )
 
-var (
-	reTableName = regexp.MustCompile(`\{\{\s*.TableName\s*}}`)
-)
-
 func CreateMySQL(ctx context.Context, db *sql.DB, tableName string) error {
-	createSQL := reTableName.ReplaceAllString(mysqlCreateTable, tableName)
+	createSQL := sqlstore.ReTableName.ReplaceAllString(mysqlCreateTable, tableName)
 
 	_, err := db.ExecContext(ctx, createSQL)
 	if err != nil {
@@ -35,7 +31,7 @@ func CreateMySQL(ctx context.Context, db *sql.DB, tableName string) error {
 	}
 
 	indexes := []string{
-		reTableName.ReplaceAllString(mysqlUniqueIndex, tableName),
+		sqlstore.ReTableName.ReplaceAllString(mysqlUniqueIndex, tableName),
 	}
 
 	for _, createIndexSQL := range indexes {
