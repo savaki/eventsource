@@ -12,3 +12,12 @@ mysql:
     - MYSQL_PASSWORD=password
     - MYSQL_ROOT_PASSWORD=password
     - MYSQL_DATABASE=eventsource
+
+postgres:
+  image: postgres:9.6-alpine
+  ports:
+    - "5432:5432"
+  environment:
+    - POSTGRES_USER=eventsource
+    - POSTGRES_PASSWORD=password
+    - POSTGRES_DB=eventsource

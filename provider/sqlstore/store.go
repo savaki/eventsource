@@ -29,9 +29,9 @@ type OpenFunc func() (*sql.DB, error)
 type Store struct {
 	openFunc         OpenFunc
 	tableName        string
-	insertSQL        string
-	selectSQL        string
-	selectVersionSQL string
+	InsertSQL        string
+	SelectSQL        string
+	SelectVersionSQL string
 	debug            bool
 	writer           io.Writer
 }
@@ -51,7 +51,7 @@ func (s *Store) Save(ctx context.Context, aggregateID string, records ...eventso
 	s.log("Saving", len(records), "events.")
 
 	err = func(tx *sql.Tx) error {
-		stmt, err := tx.Prepare(s.insertSQL)
+		stmt, err := tx.Prepare(s.InsertSQL)
 		if err != nil {
 			return err
 		}
@@ -89,9 +89,9 @@ func (s *Store) Fetch(ctx context.Context, aggregateID string, version int) (eve
 	defer db.Close()
 
 	s.log("Reading events with aggregrateID,", aggregateID)
-	query := s.selectSQL
+	query := s.SelectSQL
 	if version > 0 {
-		query = s.selectVersionSQL
+		query = s.SelectVersionSQL
 	}
 	rows, err := db.QueryContext(ctx, query, aggregateID, version)
 	if err != nil {
@@ -144,9 +144,9 @@ func New(tableName string, openFunc OpenFunc, opts ...Option) *Store {
 	s := &Store{
 		openFunc:         openFunc,
 		tableName:        tableName,
-		insertSQL:        insertSQL,
-		selectSQL:        selectSQL,
-		selectVersionSQL: selectVersionSQL,
+		InsertSQL:        insertSQL,
+		SelectSQL:        selectSQL,
+		SelectVersionSQL: selectVersionSQL,
 		writer:           ioutil.Discard,
 	}
 
