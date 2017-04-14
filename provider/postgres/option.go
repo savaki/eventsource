@@ -12,6 +12,7 @@ func WithDialectPostgres() sqlstore.Option {
 		s.InsertSQL = sqlToDollar(s.InsertSQL)
 		s.SelectSQL = sqlToDollar(s.SelectSQL)
 		s.SelectVersionSQL = sqlToDollar(s.SelectVersionSQL)
+		s.SelectAllSQL = sqlToDollar(s.SelectAllSQL)
 	}
 }
 

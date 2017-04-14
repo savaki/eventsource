@@ -17,6 +17,7 @@ const (
 	sqlInsert        = `INSERT INTO {{ .TableName }} (id, version, data, at) VALUES (?, ?, ?, ?)`
 	sqlSelectVersion = `SELECT version, data, at FROM {{ .TableName }} WHERE id = ? and version <= ?`
 	sqlSelect        = `SELECT version, data, at FROM {{ .TableName }} WHERE id = ?`
+	sqlSelectAll     = `SELECT version, data, at FROM {{ .TableName }}`
 )
 
 var (
@@ -31,6 +32,7 @@ type Store struct {
 	InsertSQL        string
 	SelectSQL        string
 	SelectVersionSQL string
+	SelectAllSQL     string
 	debug            bool
 	writer           io.Writer
 }
@@ -85,7 +87,13 @@ func (s *Store) Fetch(ctx context.Context, aggregateID string, version int) (eve
 
 	s.log("Reading events with aggregrateID,", aggregateID)
 	var rows *sql.Rows
-	if version > 0 {
+	if aggregateID == "" {
+		if rs, err := db.QueryContext(ctx, s.SelectAllSQL); err != nil {
+			return eventsource.History{}, err
+		} else {
+			rows = rs
+		}
+	} else if version > 0 {
 		if rs, err := db.QueryContext(ctx, s.SelectVersionSQL, aggregateID, version); err != nil {
 			return eventsource.History{}, err
 		} else {
@@ -141,6 +149,7 @@ func New(tableName string, openFunc OpenFunc, opts ...Option) *Store {
 	insertSQL := ReTableName.ReplaceAllString(sqlInsert, tableName)
 	selectSQL := ReTableName.ReplaceAllString(sqlSelect, tableName)
 	selectVersionSQL := ReTableName.ReplaceAllString(sqlSelectVersion, tableName)
+	selectAllSQL := ReTableName.ReplaceAllString(sqlSelectAll, tableName)
 
 	s := &Store{
 		openFunc:         openFunc,
@@ -148,6 +157,7 @@ func New(tableName string, openFunc OpenFunc, opts ...Option) *Store {
 		InsertSQL:        insertSQL,
 		SelectSQL:        selectSQL,
 		SelectVersionSQL: selectVersionSQL,
+		SelectAllSQL:     selectAllSQL,
 		writer:           ioutil.Discard,
 	}
 
