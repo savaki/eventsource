@@ -56,6 +56,13 @@ func (m *memoryStore) Save(ctx context.Context, aggregateID string, records ...R
 }
 
 func (m *memoryStore) Fetch(ctx context.Context, aggregateID string, version int) (History, error) {
+	if aggregateID == "" {
+		history := History{}
+		for _, events := range m.eventsByID {
+			history = append(history, events...)
+		}
+		return history, nil
+	}
 	history, ok := m.eventsByID[aggregateID]
 	if !ok {
 		return nil, NewError(nil, AggregateNotFound, "no aggregate found with id, %v", aggregateID)
