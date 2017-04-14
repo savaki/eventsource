@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math"
 	"regexp"
 	"sort"
 	"time"
@@ -78,10 +77,6 @@ func (s *Store) Save(ctx context.Context, aggregateID string, records ...eventso
 }
 
 func (s *Store) Fetch(ctx context.Context, aggregateID string, version int) (eventsource.History, error) {
-	if version == 0 {
-		version = math.MaxInt32
-	}
-
 	db, err := s.openFunc()
 	if err != nil {
 		return eventsource.History{}, err
@@ -89,13 +84,19 @@ func (s *Store) Fetch(ctx context.Context, aggregateID string, version int) (eve
 	defer db.Close()
 
 	s.log("Reading events with aggregrateID,", aggregateID)
-	query := s.SelectSQL
+	var rows *sql.Rows
 	if version > 0 {
-		query = s.SelectVersionSQL
-	}
-	rows, err := db.QueryContext(ctx, query, aggregateID, version)
-	if err != nil {
-		return eventsource.History{}, err
+		if rs, err := db.QueryContext(ctx, s.SelectVersionSQL, aggregateID, version); err != nil {
+			return eventsource.History{}, err
+		} else {
+			rows = rs
+		}
+	} else {
+		if rs, err := db.QueryContext(ctx, s.SelectSQL, aggregateID); err != nil {
+			return eventsource.History{}, err
+		} else {
+			rows = rs
+		}
 	}
 	defer rows.Close()
 
