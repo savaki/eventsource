@@ -20,10 +20,10 @@ func TestStore_Save(t *testing.T) {
 	db := MustOpen()
 	err := postgres.CreatePostgres(ctx, db, tableName)
 	assert.Nil(t, err)
-	db.Close()
+	defer db.Close()
 
 	// Run provider tests
 
-	store := sqlstore.New(tableName, Open, postgres.WithDialectPostgres(), sqlstore.WithDebug(os.Stderr))
+	store := sqlstore.New(tableName, db, postgres.WithDialectPostgres(), sqlstore.WithDebug(os.Stderr))
 	providertest.TestStore_Save(t, store)
 }

@@ -24,10 +24,8 @@ var (
 	ReTableName = regexp.MustCompile(`\{\{\s*.TableName\s*}}`)
 )
 
-type OpenFunc func() (*sql.DB, error)
-
 type Store struct {
-	openFunc         OpenFunc
+	db               *sql.DB
 	tableName        string
 	InsertSQL        string
 	SelectSQL        string
@@ -38,13 +36,7 @@ type Store struct {
 }
 
 func (s *Store) Save(ctx context.Context, aggregateID string, records ...eventsource.Record) error {
-	db, err := s.openFunc()
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-
-	tx, err := db.Begin()
+	tx, err := s.db.Begin()
 	if err != nil {
 		return err
 	}
@@ -79,28 +71,22 @@ func (s *Store) Save(ctx context.Context, aggregateID string, records ...eventso
 }
 
 func (s *Store) Fetch(ctx context.Context, aggregateID string, version int) (eventsource.History, error) {
-	db, err := s.openFunc()
-	if err != nil {
-		return eventsource.History{}, err
-	}
-	defer db.Close()
-
 	s.log("Reading events with aggregrateID,", aggregateID)
 	var rows *sql.Rows
 	if aggregateID == "" {
-		if rs, err := db.QueryContext(ctx, s.SelectAllSQL); err != nil {
+		if rs, err := s.db.QueryContext(ctx, s.SelectAllSQL); err != nil {
 			return eventsource.History{}, err
 		} else {
 			rows = rs
 		}
 	} else if version > 0 {
-		if rs, err := db.QueryContext(ctx, s.SelectVersionSQL, aggregateID, version); err != nil {
+		if rs, err := s.db.QueryContext(ctx, s.SelectVersionSQL, aggregateID, version); err != nil {
 			return eventsource.History{}, err
 		} else {
 			rows = rs
 		}
 	} else {
-		if rs, err := db.QueryContext(ctx, s.SelectSQL, aggregateID); err != nil {
+		if rs, err := s.db.QueryContext(ctx, s.SelectSQL, aggregateID); err != nil {
 			return eventsource.History{}, err
 		} else {
 			rows = rs
@@ -145,14 +131,14 @@ func (s *Store) log(args ...interface{}) {
 	fmt.Fprintln(s.writer, v...)
 }
 
-func New(tableName string, openFunc OpenFunc, opts ...Option) *Store {
+func New(tableName string, db *sql.DB, opts ...Option) *Store {
 	insertSQL := ReTableName.ReplaceAllString(sqlInsert, tableName)
 	selectSQL := ReTableName.ReplaceAllString(sqlSelect, tableName)
 	selectVersionSQL := ReTableName.ReplaceAllString(sqlSelectVersion, tableName)
 	selectAllSQL := ReTableName.ReplaceAllString(sqlSelectAll, tableName)
 
 	s := &Store{
-		openFunc:         openFunc,
+		db:               db,
 		tableName:        tableName,
 		InsertSQL:        insertSQL,
 		SelectSQL:        selectSQL,
