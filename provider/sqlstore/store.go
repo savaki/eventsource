@@ -66,7 +66,8 @@ func (s *Store) Save(ctx context.Context, aggregateID string, records ...eventso
 		return tx.Commit()
 	} else {
 		s.log("Failed.  Rolling back transaction.")
-		return tx.Rollback()
+		tx.Rollback()
+		return err
 	}
 }
 
