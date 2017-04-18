@@ -1,4 +1,4 @@
-package sqlstore_test
+package mysql_test
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/savaki/eventsource/provider/sqlstore"
+	"github.com/savaki/eventsource/provider/mysql"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -64,6 +64,6 @@ func TestCreateTable(t *testing.T) {
 	defer db.Close()
 
 	ctx := context.Background()
-	err := sqlstore.CreateMySQL(ctx, db, "thing_events")
+	err := mysql.CreateMySQL(ctx, db, "thing_events")
 	assert.Nil(t, err)
 }

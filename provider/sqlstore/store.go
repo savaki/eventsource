@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math"
+	"regexp"
 	"sort"
 	"time"
 
@@ -17,28 +17,26 @@ const (
 	sqlInsert        = `INSERT INTO {{ .TableName }} (id, version, data, at) VALUES (?, ?, ?, ?)`
 	sqlSelectVersion = `SELECT version, data, at FROM {{ .TableName }} WHERE id = ? and version <= ?`
 	sqlSelect        = `SELECT version, data, at FROM {{ .TableName }} WHERE id = ?`
+	sqlSelectAll     = `SELECT version, data, at FROM {{ .TableName }}`
 )
 
-type OpenFunc func() (*sql.DB, error)
+var (
+	ReTableName = regexp.MustCompile(`\{\{\s*.TableName\s*}}`)
+)
 
 type Store struct {
-	openFunc         OpenFunc
+	db               *sql.DB
 	tableName        string
-	insertSQL        string
-	selectSQL        string
-	selectVersionSQL string
+	InsertSQL        string
+	SelectSQL        string
+	SelectVersionSQL string
+	SelectAllSQL     string
 	debug            bool
 	writer           io.Writer
 }
 
 func (s *Store) Save(ctx context.Context, aggregateID string, records ...eventsource.Record) error {
-	db, err := s.openFunc()
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-
-	tx, err := db.Begin()
+	tx, err := s.db.Begin()
 	if err != nil {
 		return err
 	}
@@ -46,7 +44,7 @@ func (s *Store) Save(ctx context.Context, aggregateID string, records ...eventso
 	s.log("Saving", len(records), "events.")
 
 	err = func(tx *sql.Tx) error {
-		stmt, err := tx.Prepare(s.insertSQL)
+		stmt, err := tx.Prepare(s.InsertSQL)
 		if err != nil {
 			return err
 		}
@@ -68,29 +66,32 @@ func (s *Store) Save(ctx context.Context, aggregateID string, records ...eventso
 		return tx.Commit()
 	} else {
 		s.log("Failed.  Rolling back transaction.")
-		return tx.Rollback()
+		tx.Rollback()
+		return err
 	}
 }
 
 func (s *Store) Fetch(ctx context.Context, aggregateID string, version int) (eventsource.History, error) {
-	if version == 0 {
-		version = math.MaxInt32
-	}
-
-	db, err := s.openFunc()
-	if err != nil {
-		return eventsource.History{}, err
-	}
-	defer db.Close()
-
 	s.log("Reading events with aggregrateID,", aggregateID)
-	query := s.selectSQL
-	if version > 0 {
-		query = s.selectVersionSQL
-	}
-	rows, err := db.QueryContext(ctx, query, aggregateID, version)
-	if err != nil {
-		return eventsource.History{}, err
+	var rows *sql.Rows
+	if aggregateID == "" {
+		if rs, err := s.db.QueryContext(ctx, s.SelectAllSQL); err != nil {
+			return eventsource.History{}, err
+		} else {
+			rows = rs
+		}
+	} else if version > 0 {
+		if rs, err := s.db.QueryContext(ctx, s.SelectVersionSQL, aggregateID, version); err != nil {
+			return eventsource.History{}, err
+		} else {
+			rows = rs
+		}
+	} else {
+		if rs, err := s.db.QueryContext(ctx, s.SelectSQL, aggregateID); err != nil {
+			return eventsource.History{}, err
+		} else {
+			rows = rs
+		}
 	}
 	defer rows.Close()
 
@@ -131,17 +132,19 @@ func (s *Store) log(args ...interface{}) {
 	fmt.Fprintln(s.writer, v...)
 }
 
-func New(tableName string, openFunc OpenFunc, opts ...Option) *Store {
-	insertSQL := reTableName.ReplaceAllString(sqlInsert, tableName)
-	selectSQL := reTableName.ReplaceAllString(sqlSelect, tableName)
-	selectVersionSQL := reTableName.ReplaceAllString(sqlSelectVersion, tableName)
+func New(tableName string, db *sql.DB, opts ...Option) *Store {
+	insertSQL := ReTableName.ReplaceAllString(sqlInsert, tableName)
+	selectSQL := ReTableName.ReplaceAllString(sqlSelect, tableName)
+	selectVersionSQL := ReTableName.ReplaceAllString(sqlSelectVersion, tableName)
+	selectAllSQL := ReTableName.ReplaceAllString(sqlSelectAll, tableName)
 
 	s := &Store{
-		openFunc:         openFunc,
+		db:               db,
 		tableName:        tableName,
-		insertSQL:        insertSQL,
-		selectSQL:        selectSQL,
-		selectVersionSQL: selectVersionSQL,
+		InsertSQL:        insertSQL,
+		SelectSQL:        selectSQL,
+		SelectVersionSQL: selectVersionSQL,
+		SelectAllSQL:     selectAllSQL,
 		writer:           ioutil.Discard,
 	}
 

@@ -1,14 +1,12 @@
-package sqlstore_test
+package providertest
 
 import (
 	"context"
-	"os"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/savaki/eventsource"
-	"github.com/savaki/eventsource/provider/sqlstore"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,19 +20,7 @@ type EntitySetLast struct {
 	Last string
 }
 
-func TestStore_Save(t *testing.T) {
-	ctx := context.Background()
-	tableName := "entity_events"
-
-	// Ensure table exists
-
-	db := MustOpen()
-	err := sqlstore.CreateMySQL(ctx, db, tableName)
-	assert.Nil(t, err)
-	db.Close()
-
-	// Return
-
+func TestStore_Save(t *testing.T, store eventsource.Store) {
 	aggregateID := strconv.FormatInt(time.Now().UnixNano(), 10)
 	e1 := EntitySetFirst{
 		Model: eventsource.Model{
@@ -59,8 +45,6 @@ func TestStore_Save(t *testing.T) {
 
 	r2, err := serializer.Serialize(e2)
 	assert.Nil(t, err)
-
-	store := sqlstore.New(tableName, Open, sqlstore.WithDebug(os.Stderr))
 
 	err = store.Save(context.Background(), e1.Model.ID, r1, r2)
 	assert.Nil(t, err)
