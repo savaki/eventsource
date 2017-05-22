@@ -20,7 +20,7 @@ type UserNameSet struct {
 	Name string
 }
 
-// UserLastSet implements the eventsource.Event interface directly
+// UserEmailSet implements the eventsource.Event interface directly
 type UserEmailSet struct {
 	ID      string
 	Version int
